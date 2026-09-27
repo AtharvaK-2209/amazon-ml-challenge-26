@@ -1,0 +1,574 @@
+{
+  "meta": {
+    "generated_at": "2026-09-27T07:27:37.625348Z",
+    "phase": "1 \u2014 EDA + Noise Discovery",
+    "next_phase": "2 \u2014 Normalisation (names + addresses)",
+    "description": "Machine-readable noise specification derived from Phase 1 EDA on test data. Consumed directly by the normalisation pipeline."
+  },
+  "dataset_overview": {
+    "S1": {
+      "rows": 1732544,
+      "null_business_name": 0,
+      "null_business_address": 0,
+      "null_country": 0,
+      "unique_countries": 3,
+      "duplicate_entity_id": 0
+    },
+    "S2": {
+      "rows": 4887273,
+      "null_business_name": 46,
+      "null_business_address": 129408,
+      "null_country": 0,
+      "unique_countries": 3,
+      "duplicate_entity_id": 0
+    },
+    "S3": {
+      "rows": 5082316,
+      "null_business_name": 59,
+      "null_business_address": 136098,
+      "null_country": 0,
+      "unique_countries": 3,
+      "duplicate_entity_id": 0
+    }
+  },
+  "country_distribution": {
+    "S1": {
+      "India": 809986,
+      "US": 663106,
+      "France": 259452
+    },
+    "S2": {
+      "India": 2312565,
+      "US": 1871330,
+      "France": 703378
+    },
+    "S3": {
+      "India": 2405000,
+      "US": 1945701,
+      "France": 731615
+    }
+  },
+  "script_distribution": {
+    "S1": {
+      "latin": 1732544,
+      "devanagari": 0,
+      "other": 0,
+      "empty": 0
+    },
+    "S2": {
+      "latin": 4351900,
+      "devanagari": 303467,
+      "other": 231749,
+      "empty": 46
+    },
+    "S3": {
+      "latin": 4783598,
+      "devanagari": 170091,
+      "other": 128330,
+      "empty": 59
+    }
+  },
+  "noise_pattern_rates_pct": {
+    "name_has_abbrev": {
+      "S1": 29.4,
+      "S2": 28.05,
+      "S3": 28.66
+    },
+    "name_has_ampersand": {
+      "S1": 5.02,
+      "S2": 4.27,
+      "S3": 4.19
+    },
+    "name_all_caps": {
+      "S1": 0.0,
+      "S2": 17.25,
+      "S3": 2.72
+    },
+    "name_has_digit": {
+      "S1": 1.17,
+      "S2": 3.89,
+      "S3": 3.98
+    },
+    "addr_missing_pin": {
+      "S1": 95.63,
+      "S2": 94.93,
+      "S3": 94.96
+    },
+    "addr_has_landmark": {
+      "S1": 5.33,
+      "S2": 4.64,
+      "S3": 3.49
+    },
+    "addr_has_abbrev": {
+      "S1": 12.65,
+      "S2": 26.68,
+      "S3": 24.55
+    }
+  },
+  "length_stats": {
+    "S1_name_len": {
+      "mean": 23.8,
+      "median": 24.0,
+      "std": 7.7,
+      "min": 3.0,
+      "max": 92.0,
+      "p95": 36.0
+    },
+    "S1_addr_len": {
+      "mean": 57.2,
+      "median": 50.0,
+      "std": 25.0,
+      "min": 11.0,
+      "max": 268.0,
+      "p95": 105.0
+    },
+    "S1_name_tokens": {
+      "mean": 3.5,
+      "median": 4.0,
+      "std": 0.9,
+      "min": 1.0,
+      "max": 14.0,
+      "p95": 5.0
+    },
+    "S1_addr_tokens": {
+      "mean": 8.6,
+      "median": 8.0,
+      "std": 3.6,
+      "min": 2.0,
+      "max": 43.0,
+      "p95": 16.0
+    },
+    "S2_name_len": {
+      "mean": 25.7,
+      "median": 25.0,
+      "std": 9.1,
+      "min": 0.0,
+      "max": 102.0,
+      "p95": 42.0
+    },
+    "S2_addr_len": {
+      "mean": 50.4,
+      "median": 43.0,
+      "std": 25.3,
+      "min": 0.0,
+      "max": 269.0,
+      "p95": 99.0
+    },
+    "S2_name_tokens": {
+      "mean": 3.6,
+      "median": 4.0,
+      "std": 1.2,
+      "min": 0.0,
+      "max": 15.0,
+      "p95": 5.0
+    },
+    "S2_addr_tokens": {
+      "mean": 7.8,
+      "median": 7.0,
+      "std": 3.7,
+      "min": 0.0,
+      "max": 43.0,
+      "p95": 15.0
+    },
+    "S3_name_len": {
+      "mean": 25.7,
+      "median": 25.0,
+      "std": 9.6,
+      "min": 0.0,
+      "max": 103.0,
+      "p95": 42.0
+    },
+    "S3_addr_len": {
+      "mean": 48.7,
+      "median": 43.0,
+      "std": 22.6,
+      "min": 0.0,
+      "max": 267.0,
+      "p95": 94.0
+    },
+    "S3_name_tokens": {
+      "mean": 3.6,
+      "median": 4.0,
+      "std": 1.3,
+      "min": 0.0,
+      "max": 16.0,
+      "p95": 6.0
+    },
+    "S3_addr_tokens": {
+      "mean": 7.5,
+      "median": 7.0,
+      "std": 3.5,
+      "min": 0.0,
+      "max": 43.0,
+      "p95": 15.0
+    }
+  },
+  "normalisation_rules": [
+    {
+      "id": "N01",
+      "priority": 1,
+      "field": "business_name",
+      "trigger": "name_all_caps: S2=17.25%, S3=2.72%",
+      "action": "lowercase",
+      "params": {},
+      "rationale": "S2 has 17.25% ALL-CAPS names vs 0% in S1. Lowercasing unifies case before any string comparison.",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    },
+    {
+      "id": "N02",
+      "priority": 2,
+      "field": "business_name",
+      "trigger": "name_has_abbrev: ~29% across all sources",
+      "action": "expand_legal_suffixes",
+      "params": {
+        "expansions": {
+          "pvt": "private",
+          "ltd": "limited",
+          "llc": "limited liability company",
+          "corp": "corporation",
+          "inc": "incorporated",
+          "co": "company",
+          "llp": "limited liability partnership",
+          "plc": "public limited company",
+          "huf": "hindu undivided family",
+          "sarl": "societe a responsabilite limitee",
+          "sas": "societe par actions simplifiee",
+          "sa": "societe anonyme"
+        }
+      },
+      "rationale": "~29% of names use abbreviated legal suffixes. Expanding to canonical form prevents Corp/Corporation mismatch. French legal forms (SARL, SAS, SA) included for the zero-shot France set.",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    },
+    {
+      "id": "N03",
+      "priority": 3,
+      "field": "business_name",
+      "trigger": "name_has_ampersand: ~4-5% across all sources",
+      "action": "replace_token",
+      "params": {
+        "find": "&",
+        "replace": "and"
+      },
+      "rationale": "4-5% of names use '&' instead of 'and'. Normalise to 'and' for consistent token matching.",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    },
+    {
+      "id": "N04",
+      "priority": 4,
+      "field": "business_name",
+      "trigger": "script_dist: S2=10.9% non-Latin, S3=5.8% non-Latin; S1=100% Latin",
+      "action": "transliterate_to_latin",
+      "params": {
+        "tool": "indic_transliteration or anyascii",
+        "source_scripts": [
+          "devanagari",
+          "arabic",
+          "other"
+        ],
+        "target_script": "latin"
+      },
+      "rationale": "S1 is 100% Latin but S2 has 303K (6.2%) and S3 has 170K (3.3%) Devanagari names. Direct string similarity fails cross-script. Transliterate non-Latin to Latin before any similarity computation.",
+      "applies_to_sources": [
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "India"
+      ]
+    },
+    {
+      "id": "N05",
+      "priority": 5,
+      "field": "business_name",
+      "trigger": "French accented characters in France set (15% of all records)",
+      "action": "strip_accents",
+      "params": {
+        "method": "unicodedata.normalize('NFKD') + ascii encode",
+        "examples": {
+          "\u00e9": "e",
+          "\u00e8": "e",
+          "\u00ea": "e",
+          "\u00e0": "a",
+          "\u00e7": "c",
+          "\u00f4": "o",
+          "\u00ee": "i"
+        }
+      },
+      "rationale": "France is a zero-shot country (15% of test set). French business names contain accented Latin characters that cause false mismatches. Strip diacritics after transliteration.",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "France"
+      ]
+    },
+    {
+      "id": "N06",
+      "priority": 6,
+      "field": "business_name",
+      "trigger": "residual punctuation after above steps",
+      "action": "strip_punctuation_and_extra_whitespace",
+      "params": {
+        "keep_hyphens": true,
+        "keep_digits": true
+      },
+      "rationale": "Remove residual commas, dots, brackets. Keep hyphens (compound names) and digits (e.g. '3M', '7-Eleven' are discriminative).",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    },
+    {
+      "id": "N07",
+      "priority": 1,
+      "field": "business_address",
+      "trigger": "addr_has_abbrev: S1=12.65%, S2=26.68%, S3=24.55%",
+      "action": "expand_address_abbreviations",
+      "params": {
+        "expansions": {
+          "rd": "road",
+          "st": "street",
+          "ave": "avenue",
+          "blvd": "boulevard",
+          "dr": "drive",
+          "ln": "lane",
+          "hwy": "highway",
+          "fwy": "freeway",
+          "apt": "apartment",
+          "ste": "suite",
+          "fl": "floor",
+          "nagar": "nagar",
+          "marg": "marg",
+          "vihar": "vihar",
+          "enclave": "enclave",
+          "colony": "colony",
+          "extn": "extension",
+          "tq": "taluka",
+          "dist": "district",
+          "opp": "opposite",
+          "rue": "rue",
+          "bd": "boulevard",
+          "av": "avenue"
+        }
+      },
+      "rationale": "Address abbreviation rate is 2x higher in S2/S3 (26-27%) vs S1 (12-13%). Expanding abbreviations is the single highest-impact normalisation for address matching.",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    },
+    {
+      "id": "N08",
+      "priority": 2,
+      "field": "business_address",
+      "trigger": "null_business_address: S2=129408 (2.65%), S3=136098 (2.68%)",
+      "action": "fill_null_address",
+      "params": {
+        "fill_value": ""
+      },
+      "rationale": "2.65-2.68% of S2/S3 records have no address. Fill with empty string so they still participate in name-only matching. Do NOT drop these records.",
+      "applies_to_sources": [
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    },
+    {
+      "id": "N09",
+      "priority": 3,
+      "field": "business_address",
+      "trigger": "addr_missing_pin: ~95% across all sources",
+      "action": "do_not_use_pin_as_blocking_key",
+      "params": {},
+      "rationale": "95% of addresses lack a 5-6 digit PIN/ZIP code. Any blocking strategy that requires a PIN will drop 95% of record pairs. Use full normalised address string for TF-IDF/BM25 blocking instead.",
+      "applies_to_sources": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "applies_to_countries": [
+        "US",
+        "India",
+        "France"
+      ]
+    }
+  ],
+  "blocking_hints": [
+    {
+      "id": "B01",
+      "strategy": "name_trigram_tfidf",
+      "description": "Build a TF-IDF index (char 3-grams) over normalised business names. For each S1 record, retrieve top-K candidates from S2+S3 by cosine similarity.",
+      "derived_from": [
+        "N01",
+        "N02",
+        "N03",
+        "N04",
+        "N05",
+        "N06"
+      ],
+      "params": {
+        "analyzer": "char_wb",
+        "ngram_range": [
+          3,
+          3
+        ],
+        "top_k": 50,
+        "min_score": 0.1
+      },
+      "recall_ceiling_note": "High-recall anchor since ~29% of names share legal suffix tokens \u2014 TF-IDF naturally down-weights these."
+    },
+    {
+      "id": "B02",
+      "strategy": "sorted_neighbourhood_name_prefix",
+      "description": "Sort all records by normalised name; slide a window of size W. Any record within the window is a candidate pair.",
+      "derived_from": [
+        "N01",
+        "N02",
+        "N06"
+      ],
+      "params": {
+        "window_size": 10
+      },
+      "recall_ceiling_note": "Fast O(N log N) complement to TF-IDF. Catches transpositions that survive normalisation."
+    },
+    {
+      "id": "B03",
+      "strategy": "country_partition",
+      "description": "Always restrict candidate pairs to same-country records. Never match US\u2194India or US\u2194France.",
+      "derived_from": [
+        "country_dist"
+      ],
+      "params": {
+        "partition_key": "country"
+      },
+      "recall_ceiling_note": "100% safe assumption per problem statement. Reduces search space by ~3x."
+    },
+    {
+      "id": "B04",
+      "strategy": "address_token_overlap",
+      "description": "Build inverted index over normalised address tokens (min 4 chars). Candidate if S1 and S2/S3 share \u22651 rare token (IDF > threshold).",
+      "derived_from": [
+        "N07",
+        "N08"
+      ],
+      "params": {
+        "min_token_len": 4,
+        "idf_threshold": 3.0
+      },
+      "recall_ceiling_note": "Compensates for name-only blocking misses when addresses are clean. Disable for null-address records."
+    },
+    {
+      "id": "B05",
+      "strategy": "name_first_token_exact",
+      "description": "Group records by their first normalised name token. All records sharing the same first token are candidates.",
+      "derived_from": [
+        "N01",
+        "N02"
+      ],
+      "params": {
+        "min_token_len": 3
+      },
+      "recall_ceiling_note": "Very fast O(N) grouping. High precision on name-stable businesses. High false-positive rate for generic first tokens (e.g. 'india', 'national') \u2014 filter by IDF."
+    },
+    {
+      "id": "B06",
+      "strategy": "devanagari_transliteration_fallback",
+      "description": "For non-Latin S2/S3 records that map to a transliterated form, also generate candidate pairs using phonetic hashing (Soundex/Metaphone) of the transliterated name.",
+      "derived_from": [
+        "N04"
+      ],
+      "params": {
+        "phonetic_algo": "metaphone",
+        "applies_to_scripts": [
+          "devanagari"
+        ]
+      },
+      "recall_ceiling_note": "Handles transliteration noise: 'Shri' vs 'Sri', 'Kumar' vs 'Kumar'. Essential for 303K Devanagari records in S2."
+    }
+  ],
+  "country_flags": {
+    "US": {
+      "zero_shot": false,
+      "dominant_script": "latin",
+      "address_format_notes": "Street number + street name + city + state abbreviation + optional ZIP. ZIP present in <5% of records (addr_missing_pin ~95%).",
+      "special_handling": []
+    },
+    "India": {
+      "zero_shot": false,
+      "dominant_script": "latin_and_devanagari",
+      "address_format_notes": "Highly variable: Plot/Flat/Survey numbers, locality names, taluka/district/state. Landmark-based references common (~5%). PIN codes rarely present.",
+      "special_handling": [
+        "transliterate_devanagari",
+        "expand_tq_dist_abbreviations"
+      ]
+    },
+    "France": {
+      "zero_shot": true,
+      "dominant_script": "latin_with_accents",
+      "address_format_notes": "French format: street number + rue/boulevard/avenue + city + postal code (5-digit). Postal code present more often than US/India.",
+      "special_handling": [
+        "strip_french_accents",
+        "handle_sarl_sas_sa_suffixes"
+      ],
+      "warning": "France does NOT appear in the training data. Do not hard-code country logic. All normalisation must be generic enough to handle unseen countries."
+    }
+  },
+  "global_flags": {
+    "pin_zip_usable_as_blocking_key": false,
+    "pin_coverage_pct": {
+      "S1": 4.37,
+      "S2": 5.07,
+      "S3": 5.04
+    },
+    "safe_to_drop_null_address_records": false,
+    "must_handle_zero_shot_countries": true,
+    "evaluation_metric": "F_0.5 (macro-averaged, precision-heavy)",
+    "precision_recall_tradeoff": "Prefer precision \u2014 false merges penalised 2x vs missed matches",
+    "total_test_s1_records_to_submit": 1732544
+  }
+}

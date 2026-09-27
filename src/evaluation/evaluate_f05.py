@@ -1,228 +1,70 @@
-"""
-Evaluation module for entity resolution.
-
-This module implements F0.5 evaluation aligned with competition metrics.
-Evaluation is performed at the Source-1 entity level.
-
-F0.5 weights precision more heavily than recall, making false merges costly.
-"""
-
-from typing import Dict, Any, List, Tuple, Optional
-import logging
-
-logger = logging.getLogger(__name__)
+"""evaluate_f05.py — F_0.5 macro-averaged evaluation (matches Amazon's scoring)."""
+import pandas as pd
+import numpy as np
 
 
-def compute_precision(
-    true_positives: int,
-    false_positives: int
-) -> float:
-    """
-    Compute precision score.
-    
-    Args:
-        true_positives: Number of true positive matches
-        false_positives: Number of false positive matches
-        
-    Returns:
-        Precision score in [0, 1]
-    """
-    if true_positives + false_positives == 0:
+def f_beta(precision: float, recall: float, beta: float = 0.5) -> float:
+    """Compute F_beta score."""
+    b2 = beta ** 2
+    denom = b2 * precision + recall
+    if denom == 0:
         return 0.0
-    
-    return true_positives / (true_positives + false_positives)
+    return (1 + b2) * precision * recall / denom
 
 
-def compute_recall(
-    true_positives: int,
-    false_negatives: int
-) -> float:
+def evaluate_f05(predictions: pd.DataFrame,
+                 ground_truth: pd.DataFrame,
+                 beta: float = 0.5) -> dict:
     """
-    Compute recall score.
-    
-    Args:
-        true_positives: Number of true positive matches
-        false_negatives: Number of false negative matches
-        
-    Returns:
-        Recall score in [0, 1]
-    """
-    if true_positives + false_negatives == 0:
-        return 0.0
-    
-    return true_positives / (true_positives + false_negatives)
+    Compute macro-averaged F_0.5, Precision, Recall.
 
+    predictions:  [source1_entity_id, matched_entity_ids]  (comma-sep string)
+    ground_truth: [source1_entity_id, matched_entity_ids]  (comma-sep string)
 
-def compute_fbeta(
-    precision: float,
-    recall: float,
-    beta: float = 0.5
-) -> float:
+    Returns dict: {f05, precision, recall, false_merges, singleton_accuracy, n_entities}
     """
-    Compute F-beta score.
-    
-    F-beta = (1 + beta^2) * (precision * recall) / (beta^2 * precision + recall)
-    
-    For beta=0.5, precision is weighted more heavily than recall.
-    
-    Args:
-        precision: Precision score
-        recall: Recall score
-        beta: Weight parameter (0.5 for competition metric)
-        
-    Returns:
-        F-beta score in [0, 1]
-    """
-    if precision + recall == 0:
-        return 0.0
-    
-    beta_squared = beta ** 2
-    fbeta = (1 + beta_squared) * (precision * recall) / \
-            (beta_squared * precision + recall)
-    
-    return fbeta
+    def parse_ids(s):
+        if pd.isna(s) or str(s).strip() == "":
+            return set()
+        return set(str(s).split(","))
 
+    gt_dict   = {r.source1_entity_id: parse_ids(r.matched_entity_ids)
+                 for _, r in ground_truth.iterrows()}
+    pred_dict = {r.source1_entity_id: parse_ids(r.matched_entity_ids)
+                 for _, r in predictions.iterrows()}
 
-class EntityEvaluator:
-    """
-    Entity-level evaluator for entity resolution.
-    
-    Evaluates matching quality at the Source-1 entity level using
-    macro-averaged F0.5 score as required by the competition.
-    """
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize evaluator.
-        
-        Args:
-            config: Evaluation configuration including:
-                - beta: F-beta parameter (default: 0.5)
-                - log_confusion_matrix: Whether to log confusion matrix
-                - log_per_entity_results: Whether to log per-entity results
-        """
-        self.config = config or {}
-        self.beta = self.config.get('beta', 0.5)
-        self.log_confusion_matrix = self.config.get('log_confusion_matrix', True)
-        self.log_per_entity_results = self.config.get('log_per_entity_results', False)
-        
-        logger.info(f"Initializing EntityEvaluator with F{self.beta} metric")
-    
-    def evaluate(
-        self,
-        predictions: Dict[str, Tuple[str, str]],
-        ground_truth: Dict[str, Tuple[str, str]]
-    ) -> Dict[str, float]:
-        """
-        Evaluate entity matching predictions against ground truth.
-        
-        Args:
-            predictions: Dictionary mapping s1_id to (s2_id, s3_id) predictions
-            ground_truth: Dictionary mapping s1_id to (s2_id, s3_id) true matches
-            
-        Returns:
-            Dictionary with evaluation metrics:
-            - precision
-            - recall
-            - f0.5
-            - true_positives
-            - false_positives
-            - false_negatives
-            
-        TODO: Implement full evaluation logic in Phase 1
-        """
-        logger.info(f"Evaluating {len(predictions)} predictions against {len(ground_truth)} ground truth")
-        
-        true_positives = 0
-        false_positives = 0
-        false_negatives = 0
-        
-        # TODO: Implement entity-level evaluation
-        # For each S1 entity:
-        # - Check if prediction matches ground truth
-        # - Count TP, FP, FN
-        
-        precision = compute_precision(true_positives, false_positives)
-        recall = compute_recall(true_positives, false_negatives)
-        fbeta = compute_fbeta(precision, recall, self.beta)
-        
-        results = {
-            'precision': precision,
-            'recall': recall,
-            'f0.5': fbeta,
-            'true_positives': true_positives,
-            'false_positives': false_positives,
-            'false_negatives': false_negatives
-        }
-        
-        logger.info(f"Evaluation results: {results}")
-        return results
-    
-    def compute_macro_f05(
-        self,
-        predictions: Dict[str, Tuple[str, str]],
-        ground_truth: Dict[str, Tuple[str, str]]
-    ) -> float:
-        """
-        Compute macro-averaged F0.5 score at entity level.
-        
-        Macro-average computes F0.5 for each S1 entity and then averages,
-        giving equal weight to each entity regardless of match status.
-        
-        Args:
-            predictions: Dictionary mapping s1_id to (s2_id, s3_id) predictions
-            ground_truth: Dictionary mapping s1_id to (s2_id, s3_id) true matches
-            
-        Returns:
-            Macro-averaged F0.5 score
-            
-        TODO: Implement in Phase 1
-        """
-        logger.info("Computing macro-averaged F0.5")
-        
-        # TODO: Implement macro-averaged F0.5
-        
-        return 0.0
-    
-    def generate_confusion_matrix(
-        self,
-        predictions: Dict[str, Tuple[str, str]],
-        ground_truth: Dict[str, Tuple[str, str]]
-    ) -> Dict[str, int]:
-        """
-        Generate confusion matrix for entity matching.
-        
-        Args:
-            predictions: Dictionary mapping s1_id to (s2_id, s3_id) predictions
-            ground_truth: Dictionary mapping s1_id to (s2_id, s3_id) true matches
-            
-        Returns:
-            Dictionary with confusion matrix counts
-            
-        TODO: Implement in Phase 1
-        """
-        return {
-            'true_positives': 0,
-            'false_positives': 0,
-            'true_negatives': 0,
-            'false_negatives': 0
-        }
-    
-    def log_per_entity_results(
-        self,
-        predictions: Dict[str, Tuple[str, str]],
-        ground_truth: Dict[str, Tuple[str, str]],
-        output_path: str
-    ) -> None:
-        """
-        Log detailed per-entity results for analysis.
-        
-        Args:
-            predictions: Dictionary mapping s1_id to (s2_id, s3_id) predictions
-            ground_truth: Dictionary mapping s1_id to (s2_id, s3_id) true matches
-            output_path: Path to save results
-            
-        TODO: Implement in Phase 1
-        """
-        logger.info(f"Logging per-entity results to {output_path}")
-        # TODO: Implement detailed logging
+    entity_ids = set(gt_dict.keys())
+    precisions, recalls, f05s = [], [], []
+    false_merges = 0
+    singleton_correct = 0
+    singleton_total = 0
+
+    for eid in entity_ids:
+        true_set = gt_dict.get(eid, set())
+        pred_set = pred_dict.get(eid, set())
+
+        # Singleton tracking
+        if not true_set:
+            singleton_total += 1
+            if not pred_set:
+                singleton_correct += 1
+            else:
+                false_merges += len(pred_set)
+
+        tp = len(true_set & pred_set)
+        p  = tp / len(pred_set) if pred_set else (1.0 if not true_set else 0.0)
+        r  = tp / len(true_set) if true_set else (1.0 if not pred_set else 0.0)
+        f  = f_beta(p, r, beta)
+
+        precisions.append(p)
+        recalls.append(r)
+        f05s.append(f)
+
+    return {
+        "f05":               round(np.mean(f05s), 6),
+        "precision":         round(np.mean(precisions), 6),
+        "recall":            round(np.mean(recalls), 6),
+        "false_merges":      false_merges,
+        "singleton_accuracy": round(singleton_correct / max(singleton_total, 1), 4),
+        "n_entities":        len(entity_ids),
+    }

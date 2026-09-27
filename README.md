@@ -1,284 +1,100 @@
-# Amazon ML Challenge 2026 - Entity Resolution Pipeline
-
-## Problem Overview
-
-This project solves an entity matching / record linkage problem across three business data sources:
-
-**Source 1 (S1):**
-- entity_id
-- business_name
-- business_address
-- country
-
-**Source 2 (S2):**
-- entity_id
-- business_name
-- business_address
-- country
-
-**Source 3 (S3):**
-- entity_id
-- business_name
-- business_address
-- country
-
-**Goal:** Identify which S2/S3 entities correspond to each S1 entity.
-
-**Evaluation Metric:** Macro-averaged F0.5 at the Source-1 entity level. Precision is weighted more heavily than recall, so false merges are particularly costly.
-
-## Planned Pipeline
-
-```
-Load Data
-    ↓
-Normalize Text
-    ↓
-Multi-Pass Blocking
-    ↓
-Pairwise Feature Engineering
-    ↓
-XGBoost Classification
-    ↓
-Probability Calibration
-    ↓
-Precision-First Decision Engine
-    ↓
-Entity-Level Aggregation
-    ↓
-Evaluation & Submission
-```
-
-### Pipeline Stages (To Be Implemented)
-
-1. **Normalization** (`src/preprocessing/`)
-   - Text standardization
-   - Address parsing
-   - Unicode normalization
-   - Abbreviation expansion
-
-2. **Blocking** (`src/blocking/`)
-   - Exact match blocking
-   - Token overlap blocking
-   - TF-IDF similarity blocking
-   - FAISS nearest neighbor blocking
-   - Candidate generation only (no final decisions)
-
-3. **Features** (`src/features/`)
-   - Name similarity features (Jaccard, Levenshtein, token sort ratio, etc.)
-   - Address similarity features (numeric match, street type, city match)
-   - Cross-field features (country match, combined similarity)
-
-4. **Models** (`src/models/`)
-   - XGBoost binary classifier
-   - Probability calibration (isotonic regression or Platt scaling)
-
-5. **Decision Engine** (`src/decision/`)
-   - Threshold-based matching (precision-first)
-   - Margin logic for ambiguous cases
-   - Singleton detection for no-match handling
-
-6. **Evaluation** (`src/evaluation/`)
-   - Entity-level F0.5 computation
-   - Confusion matrix analysis
-   - Per-entity result logging
+# Amazon ML Challenge 2026 — Business Entity Resolution
 
 ## Project Structure
 
 ```
-amazon-ml-challenge/
-├── data/                    # Data storage (not committed to Git)
+amazon_ml/
+├── data/                          # symlink or copy of student_resource/dataset/
 │   ├── train/
 │   └── test/
-├── src/                     # Main source code
-│   ├── __init__.py
-│   ├── config.py           # Configuration management
-│   ├── pipeline.py         # Main orchestration
-│   ├── preprocessing/      # Text normalization and address parsing
-│   ├── blocking/           # Candidate generation strategies
-│   ├── features/           # Feature engineering
-│   ├── models/             # Model training and prediction
-│   ├── decision/           # Threshold and decision logic
-│   └── evaluation/         # F0.5 evaluation
-├── notebooks/              # Jupyter notebooks for EDA and experiments
-├── experiments/            # Experiment tracking and results
-├── output/                 # Generated outputs
-├── configs/                # Configuration files
-│   └── config.yaml
-├── tests/                  # Unit tests
-├── requirements.txt        # Python dependencies
-├── README.md               # This file
-├── .gitignore              # Git exclusions
-├── .env.example            # Environment variables template
-└── PROJECT_RULES.md        # Competition constraints
+│
+├── src/
+│   ├── config.py                  # all paths, hyperparams, norm/blocking/model config
+│   │
+│   ├── preprocessing/
+│   │   ├── normalize.py           # Phase 2: name + address normalisation engine
+│   │   └── address_parser.py      # structured address component extraction
+│   │
+│   ├── blocking/
+│   │   ├── exact_blocking.py      # B05: first-token exact match
+│   │   ├── token_blocking.py      # B02: sorted neighbourhood
+│   │   ├── tfidf_blocking.py      # B01: TF-IDF char-ngram (primary)
+│   │   └── faiss_blocking.py      # B01 variant: dense ANN (SageMaker)
+│   │
+│   ├── features/
+│   │   ├── name_features.py       # Phase 4: RapidFuzz + Jaccard name features
+│   │   ├── address_features.py    # Phase 4: address similarity features
+│   │   └── pair_features.py       # Phase 4: full pairwise feature assembly
+│   │
+│   ├── models/
+│   │   ├── train_xgb.py           # Phase 5: XGBoost + hard negative mining
+│   │   ├── predict.py             # Phase 5/6: inference + thresholding
+│   │   └── saved/                 # model artifacts (joblib)
+│   │
+│   ├── decision/
+│   │   ├── threshold.py           # Phase 6: threshold sweep
+│   │   ├── margin.py              # Phase 6: margin-based precision filter
+│   │   └── singleton.py           # Phase 6: singleton filling for submission
+│   │
+│   ├── evaluation/
+│   │   └── evaluate_f05.py        # F_0.5 macro-averaged evaluator
+│   │
+│   └── pipeline.py                # end-to-end orchestrator
+│
+├── notebooks/                     # Jupyter / Colab EDA notebooks
+├── experiments/                   # exp001_baseline/, exp002_char_tfidf/, …
+├── output/                        # matching_results.tsv + candidate_pairs.tsv
+├── configs/                       # YAML experiment configs
+├── eda_output/
+│   ├── noise_spec.json            # 🔑 machine-readable noise spec (drives Phase 2+3)
+│   ├── data_quality_report.md     # human-readable Phase 1 report
+│   ├── *.csv                      # EDA summary tables
+│   └── plots/                     # all EDA visualisations
+│
+├── eda_test_data.py               # Phase 1: EDA script
+├── generate_noise_spec.py         # Phase 1: noise spec generator
+├── requirements.txt
+└── README.md
 ```
 
-## Local Setup
+## Phase Map
 
-### Requirements
+| Phase | Name | Key Output |
+|-------|------|-----------|
+| 0 | AWS + Project Setup | this structure |
+| 1 | EDA + Noise Discovery | `eda_output/noise_spec.json` |
+| 2 | Normalisation Engine | normalised DataFrames |
+| 3 | High-Recall Multi-Pass Blocking | `output/candidate_pairs.tsv` |
+| 4 | Pairwise Feature Engineering | `features/*.parquet` |
+| 5 | XGBoost + Hard Negatives | `src/models/saved/model_vN.joblib` |
+| 6 | Precision-First Decision Engine | `output/matching_results.tsv` |
+| 7 | Experimentation War Room | `experiments/` |
+| 8 | Final Pipeline + Submission | submission zip |
 
-- Python 3.11+
-- pip or conda
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd amazon-ml-challenge
-   ```
-
-2. **Create virtual environment:**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment variables:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration (optional for local development)
-   ```
-
-5. **Place data files:**
-   - Training data in `data/train/`
-   - Test data in `data/test/`
-   - **Do not commit data files to Git**
-
-### Running the Pipeline
+## Quickstart
 
 ```bash
-# Run with default configuration
-python -m src.pipeline
+# Install dependencies
+pip install -r requirements.txt
 
-# Or run as module
-python src/pipeline.py
+# Run EDA on test data (Phase 1)
+python eda_test_data.py
+python generate_noise_spec.py
+
+# Run full test pipeline (Phase 2–6)
+python -m src.pipeline --split test --threshold 0.70
+
+# Validate output
+python student_resource/utils/validate_submission.py \
+    --matching output/matching_results.tsv \
+    --candidate output/candidate_pairs.tsv \
+    --test-dir student_resource/dataset/test
 ```
 
-## AWS Architecture (Future)
+## Evaluation Metric
 
-The project is designed to support AWS deployment:
-
+**F_0.5 macro-averaged** (precision-heavy):
 ```
-Local Development
-    ↓
-S3 Data Storage
-    ↓
-SageMaker Training
-    ↓
-S3 Model Artifacts
-    ↓
-SageMaker Batch Transform
-    ↓
-S3 Outputs
+F_0.5 = (1.25 × P × R) / (0.25 × P + R)
 ```
-
-**Phase 0:** Local development only - no AWS resources created or used.
-
-**Future Phases:**
-- S3 for data and model storage
-- SageMaker for training and inference
-- CloudWatch for logging
-- IAM for access control
-
-## Configuration
-
-Configuration is managed via:
-- `configs/config.yaml` - Main configuration file
-- Environment variables - For secrets and deployment-specific settings
-- `src/config.py` - Configuration loader and management
-
-Key configuration sections:
-- Data paths (local and S3)
-- Blocking parameters
-- Feature engineering settings
-- XGBoost hyperparameters
-- Decision thresholds
-- Logging level
-
-## Experiment Methodology
-
-All experiments are tracked in `experiments/` directory. Each experiment should record:
-
-- Experiment ID and date
-- Code version / Git commit
-- Preprocessing configuration
-- Blocking configuration
-- Feature configuration
-- Model configuration
-- Threshold and margin settings
-- Validation F0.5, precision, recall
-- Candidate recall
-- Runtime
-- Notes and observations
-
-See `experiments/README.md` for detailed tracking guidelines.
-
-## Git Workflow
-
-### Branches
-
-- `main` - Stable production code only
-- `experiment/baseline` - Baseline model experiments
-- `experiment/tfidf` - TF-IDF blocking experiments
-- `experiment/hard-negative` - Hard negative mining experiments
-- `experiment/threshold` - Threshold optimization experiments
-
-### Workflow
-
-1. Create feature branch from `main`
-2. Implement and test changes
-3. Submit pull request
-4. Review and merge to `main`
-5. Delete feature branch
-
-**Important:** Never commit data, credentials, or generated outputs to Git.
-
-## Competition Constraints
-
-See `PROJECT_RULES.md` for complete list of competition constraints. Key rules:
-
-1. **Data Usage:** Use only competition-provided data. No external business lookup.
-2. **No External APIs:** No Google Maps, geocoding, or internet-based enrichment.
-3. **Country Handling:** Countries are open-set. Do not hard-code for specific countries.
-4. **Evaluation Metric:** Optimize for F0.5 (precision-weighted) at entity level.
-5. **Precision First:** False merges are costly - prioritize precision.
-6. **Singleton Handling:** Correct no-match handling is critical.
-7. **Reproducibility:** All experiments must be reproducible.
-8. **Security:** Never commit credentials or secrets.
-
-## Current Status
-
-**Phase 0 Complete:**
-- [x] Project structure created
-- [x] Configuration system implemented
-- [x] Placeholder modules for all pipeline stages
-- [x] Documentation and project rules
-- [x] Git repository initialized
-- [x] Testing infrastructure
-
-**Phase 1 (Next Steps):**
-- [ ] Implement text normalization
-- [ ] Implement blocking strategies
-- [ ] Implement feature engineering
-- [ ] Implement XGBoost training
-- [ ] Implement decision engine
-- [ ] Implement evaluation
-- [ ] Generate first submission
-
-## License
-
-This project is for the Amazon ML Challenge 2026 competition only.
-
-## Team
-
-- Lead ML Engineer: [Your Name]
-- Team Members: [Team Member Names]
-
----
-
-**Note:** This project is under active development. The ML pipeline components are not yet implemented - only the architectural framework exists in Phase 0.
+False merges cost 2× more than missed links. Correctly predicting singletons (no-match entities) earns full credit.

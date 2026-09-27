@@ -1,244 +1,107 @@
 """
-Configuration management for Amazon ML Challenge 2026 Entity Resolution Pipeline.
-
-This module provides centralized configuration loading and management,
-supporting both local development and AWS deployment scenarios.
+config.py — Central configuration for the Amazon ML Challenge pipeline.
+All paths, constants and hyperparameters live here.
+Import with: from src.config import CFG
 """
 
-import os
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, field
-import yaml
-import logging
 
-logger = logging.getLogger(__name__)
+ROOT = Path(__file__).resolve().parent.parent   # project root
 
+# ── Data paths ─────────────────────────────────────────────
+DATA_DIR   = ROOT / "student_resource" / "dataset"
+TRAIN_DIR  = DATA_DIR / "train"
+TEST_DIR   = DATA_DIR / "test"
+EDA_DIR    = ROOT / "eda_output"
+OUTPUT_DIR   = ROOT / "output"
+FEATURES_DIR = ROOT / "features"
+CONFIGS_DIR  = ROOT / "configs"
+MODELS_DIR   = ROOT / "src" / "models" / "saved"
 
-@dataclass
-class DataConfig:
-    """Data path configuration."""
-    train_dir: Path
-    test_dir: Path
-    output_dir: Path
-    use_s3: bool = False
-    s3_bucket: Optional[str] = None
-    s3_prefix: Optional[str] = None
+TRAIN_S1  = TRAIN_DIR / "train_source1.tsv"
+TRAIN_S2  = TRAIN_DIR / "train_source2.tsv"
+TRAIN_S3  = TRAIN_DIR / "train_source3.tsv"
+TRAIN_GT  = TRAIN_DIR / "train_ground_truth.tsv"
 
+TEST_S1   = TEST_DIR / "test_source1.tsv"
+TEST_S2   = TEST_DIR / "test_source2.tsv"
+TEST_S3   = TEST_DIR / "test_source3.tsv"
 
-@dataclass
-class BlockingConfig:
-    """Blocking strategy configuration."""
-    passes: List[Dict[str, Any]] = field(default_factory=list)
-    tfidf: Dict[str, Any] = field(default_factory=dict)
-    faiss: Dict[str, Any] = field(default_factory=dict)
+OUTPUT_MATCHING   = OUTPUT_DIR / "matching_results.tsv"
+OUTPUT_CANDIDATES = OUTPUT_DIR / "candidate_pairs.tsv"
 
+NOISE_SPEC = EDA_DIR / "noise_spec.json"
 
-@dataclass
-class FeatureConfig:
-    """Feature engineering configuration."""
-    name_features: List[str] = field(default_factory=list)
-    address_features: List[str] = field(default_factory=list)
-    pair_features: List[str] = field(default_factory=list)
+# ── Load noise spec (if available) ─────────────────────────
+def load_noise_spec() -> dict:
+    if NOISE_SPEC.exists():
+        with open(NOISE_SPEC) as f:
+            return json.load(f)
+    return {}
 
+# ── Normalisation config ────────────────────────────────────
+NORM = {
+    "legal_suffix_expansions": {
+        "pvt": "private", "ltd": "limited", "llc": "limited liability company",
+        "corp": "corporation", "inc": "incorporated", "co": "company",
+        "llp": "limited liability partnership", "plc": "public limited company",
+        "huf": "hindu undivided family", "sarl": "societe a responsabilite limitee",
+        "sas": "societe par actions simplifiee", "sa": "societe anonyme",
+    },
+    "address_abbreviation_expansions": {
+        "rd": "road", "st": "street", "ave": "avenue", "blvd": "boulevard",
+        "dr": "drive", "ln": "lane", "hwy": "highway",
+        "apt": "apartment", "ste": "suite", "fl": "floor",
+        "tq": "taluka", "dist": "district", "opp": "opposite",
+        "extn": "extension",
+    },
+}
 
-@dataclass
-class ModelConfig:
-    """Model training and prediction configuration."""
-    xgboost: Dict[str, Any] = field(default_factory=dict)
-    calibration: Dict[str, Any] = field(default_factory=dict)
+# ── Blocking config ─────────────────────────────────────────
+BLOCKING = {
+    "tfidf_ngram_range": (3, 3),
+    "tfidf_analyzer": "char_wb",
+    "tfidf_top_k": 50,
+    "tfidf_min_score": 0.10,
+    "sorted_neighbourhood_window": 10,
+    "address_idf_threshold": 3.0,
+    "address_min_token_len": 4,
+    "partition_key": "country",          # hard country partition
+}
 
+# ── Feature config ──────────────────────────────────────────
+FEATURES = {
+    "rapidfuzz_scorers": ["ratio", "WRatio", "token_sort_ratio", "token_set_ratio"],
+    "name_tfidf_max_features": 50000,
+    "addr_tfidf_max_features": 50000,
+}
 
-@dataclass
-class DecisionConfig:
-    """Decision engine configuration."""
-    match_threshold: float = 0.85
-    margin_threshold: float = 0.15
-    singleton_detection: bool = True
-    singleton_threshold: float = 0.3
+# ── Model config ────────────────────────────────────────────
+MODEL = {
+    "xgb_params": {
+        "n_estimators": 500,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "use_label_encoder": False,
+        "eval_metric": "logloss",
+        "random_state": 42,
+    },
+    "validation_split": 0.20,   # 80/20 split by S1 entity
+    "random_seed": 42,
+}
 
+# ── Decision engine config ──────────────────────────────────
+DECISION = {
+    "threshold_sweep": [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95],
+    "default_threshold": 0.70,
+    "singleton_strategy": "no_match_if_max_score_below_threshold",
+}
 
-@dataclass
-class Config:
-    """Main configuration container."""
-    random_seed: int = 42
-    data: DataConfig = None
-    blocking: BlockingConfig = None
-    features: FeatureConfig = None
-    model: ModelConfig = None
-    decision: DecisionConfig = None
-    evaluation: Dict[str, Any] = field(default_factory=dict)
-    logging: Dict[str, Any] = field(default_factory=dict)
-    aws_region: Optional[str] = None
-    
-    def __post_init__(self):
-        """Validate configuration after initialization."""
-        if self.data is None:
-            self.data = DataConfig(
-                train_dir=Path("data/train"),
-                test_dir=Path("data/test"),
-                output_dir=Path("output")
-            )
-
-
-def _expand_env_vars(config_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Recursively expand environment variables in configuration values.
-    
-    Supports ${ENV_VAR} syntax in YAML configuration.
-    
-    Args:
-        config_dict: Configuration dictionary to process
-        
-    Returns:
-        Configuration dictionary with environment variables expanded
-    """
-    if isinstance(config_dict, dict):
-        return {k: _expand_env_vars(v) for k, v in config_dict.items()}
-    elif isinstance(config_dict, list):
-        return [_expand_env_vars(item) for item in config_dict]
-    elif isinstance(config_dict, str):
-        if config_dict.startswith("${") and config_dict.endswith("}"):
-            env_var = config_dict[2:-1]
-            return os.getenv(env_var, "")
-        return config_dict
-    else:
-        return config_dict
-
-
-def load_config(config_path: Optional[Path] = None) -> Config:
-    """
-    Load configuration from YAML file.
-    
-    Args:
-        config_path: Path to configuration file. If None, uses default location.
-        
-    Returns:
-        Config object with loaded settings
-        
-    Raises:
-        FileNotFoundError: If configuration file does not exist
-        yaml.YAMLError: If configuration file is invalid
-    """
-    if config_path is None:
-        # Default configuration path
-        config_path = Path(__file__).parent.parent / "configs" / "config.yaml"
-    
-    config_path = Path(config_path)
-    
-    if not config_path.exists():
-        logger.warning(f"Configuration file not found at {config_path}, using defaults")
-        return Config()
-    
-    logger.info(f"Loading configuration from {config_path}")
-    
-    with open(config_path, "r") as f:
-        config_dict = yaml.safe_load(f)
-    
-    # Expand environment variables
-    config_dict = _expand_env_vars(config_dict)
-    
-    # Parse configuration sections
-    data_config = DataConfig(
-        train_dir=Path(config_dict.get("data", {}).get("train_dir", "data/train")),
-        test_dir=Path(config_dict.get("data", {}).get("test_dir", "data/test")),
-        output_dir=Path(config_dict.get("data", {}).get("output_dir", "output")),
-        use_s3=config_dict.get("data", {}).get("use_s3", False),
-        s3_bucket=config_dict.get("data", {}).get("s3_bucket"),
-        s3_prefix=config_dict.get("data", {}).get("s3_prefix")
-    )
-    
-    blocking_dict = config_dict.get("blocking", {})
-    blocking_config = BlockingConfig(
-        passes=blocking_dict.get("passes", []),
-        tfidf=blocking_dict.get("tfidf", {}),
-        faiss=blocking_dict.get("faiss", {})
-    )
-    
-    features_dict = config_dict.get("features", {})
-    feature_config = FeatureConfig(
-        name_features=features_dict.get("name_features", []),
-        address_features=features_dict.get("address_features", []),
-        pair_features=features_dict.get("pair_features", [])
-    )
-    
-    model_config = ModelConfig(
-        xgboost=config_dict.get("model", {}).get("xgboost", {}),
-        calibration=config_dict.get("model", {}).get("calibration", {})
-    )
-    
-    decision_dict = config_dict.get("decision", {})
-    decision_config = DecisionConfig(
-        match_threshold=decision_dict.get("match_threshold", 0.85),
-        margin_threshold=decision_dict.get("margin_threshold", 0.15),
-        singleton_detection=decision_dict.get("singleton_detection", True),
-        singleton_threshold=decision_dict.get("singleton_threshold", 0.3)
-    )
-    
-    config = Config(
-        random_seed=config_dict.get("random_seed", 42),
-        data=data_config,
-        blocking=blocking_config,
-        features=feature_config,
-        model=model_config,
-        decision=decision_config,
-        evaluation=config_dict.get("evaluation", {}),
-        logging=config_dict.get("logging", {}),
-        aws_region=config_dict.get("aws_region")
-    )
-    
-    logger.info("Configuration loaded successfully")
-    return config
-
-
-def setup_logging(config: Config) -> None:
-    """
-    Setup logging configuration based on config settings.
-    
-    Args:
-        config: Configuration object with logging settings
-    """
-    log_config = config.logging
-    
-    level = getattr(logging, log_config.get("level", "INFO"))
-    log_format = log_config.get("format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    
-    handlers = []
-    
-    if log_config.get("log_to_console", True):
-        handlers.append(logging.StreamHandler())
-    
-    if log_config.get("log_to_file", True):
-        log_file = Path(log_config.get("log_file", "logs/pipeline.log"))
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(log_file))
-    
-    logging.basicConfig(
-        level=level,
-        format=log_format,
-        handlers=handlers
-    )
-    
-    logger.info("Logging configured successfully")
-
-
-# Global configuration instance
-_config: Optional[Config] = None
-
-
-def get_config(reload: bool = False) -> Config:
-    """
-    Get global configuration instance.
-    
-    Args:
-        reload: Force reload configuration from file
-        
-    Returns:
-        Global Config instance
-    """
-    global _config
-    
-    if _config is None or reload:
-        _config = load_config()
-    
-    return _config
+# ── Evaluation config ───────────────────────────────────────
+EVAL = {
+    "beta": 0.5,    # F_0.5
+    "macro_average": True,
+}
