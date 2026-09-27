@@ -14,7 +14,11 @@ class TestImports:
     
     def test_import_config(self):
         """Test config module imports."""
+        from src.config import Config, load_config, get_config
         import src.config as config
+        assert Config is not None
+        assert load_config is not None
+        assert get_config is not None
         assert hasattr(config, "MODEL")
         assert hasattr(config, "BLOCKING")
         assert hasattr(config, "NORM")
@@ -53,8 +57,9 @@ class TestImports:
     def test_import_models(self):
         """Test model modules import."""
         from src.models.train_xgb import train
-        from src.models.predict import predict_matches
+        from src.models.predict import predict_proba, predict_matches
         assert train is not None
+        assert predict_proba is not None
         assert predict_matches is not None
     
     def test_import_decision(self):
@@ -68,8 +73,9 @@ class TestImports:
     
     def test_import_evaluation(self):
         """Test evaluation modules import."""
-        from src.evaluation.evaluate_f05 import evaluate_f05
+        from src.evaluation.evaluate_f05 import evaluate_f05, f_beta
         assert evaluate_f05 is not None
+        assert f_beta is not None
     
     def test_import_pipeline(self):
         """Test pipeline module imports."""
@@ -83,9 +89,8 @@ class TestProjectStructure:
     def test_directory_structure(self):
         """Test that all required directories exist."""
         required_dirs = [
-            'data',
-            'data/train',
-            'data/test',
+            'train',
+            'test',
             'src',
             'src/preprocessing',
             'src/blocking',
