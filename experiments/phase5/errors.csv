@@ -1,0 +1,4 @@
+source1_entity_id,candidate_entity_id,candidate_source,y_true,prediction_probability,prediction,model,error_type
+S1-976369483,S2-984109039,S2,1,0.0032956754,0,XGBoost,FALSE_NEGATIVE
+S1-318218643,S2-5757527,S2,1,0.00016666295,0,XGBoost,FALSE_NEGATIVE
+S1-8092452,S3-183988476,S3,1,0.00022074417,0,XGBoost,FALSE_NEGATIVE
