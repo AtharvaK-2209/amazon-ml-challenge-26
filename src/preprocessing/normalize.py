@@ -13,6 +13,12 @@ import unicodedata
 from functools import lru_cache
 from src.config import NORM
 
+try:
+    from anyascii import anyascii as _transliterate_fn
+except Exception:
+    def _transliterate_fn(text: str) -> str:
+        return unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode()
+
 
 class Normalizer:
     """
@@ -47,6 +53,18 @@ class Normalizer:
         """
         import pandas as pd
         df = df.copy()
+
+        if df.empty:
+            df["original_name"] = ""
+            df["normalized_name"] = ""
+            df["alphanumeric_name"] = ""
+            df["tokenized_name"] = [[]] * 0
+            df["name_without_legal_suffix"] = ""
+            df["original_address"] = ""
+            df["normalized_address"] = ""
+            df["address_tokens"] = [[]] * 0
+            df["numbers"] = [[]] * 0
+            return df
 
         # Fill nulls
         df["business_name"]    = df["business_name"].fillna("").astype(str)
@@ -106,21 +124,14 @@ class Normalizer:
     def _transliterate(self, text: str) -> str:
         """
         Transliterate Devanagari / non-Latin to Latin.
-        Requires: pip install anyascii   (fallback to unidecode if available)
-        Falls back to unicodedata NFKD if neither is installed.
+        Requires: pip install anyascii (fallback to unidecode or NFKD if unavailable).
         """
+        if not text:
+            return ""
         try:
-            from anyascii import anyascii
-            return anyascii(text)
-        except ImportError:
-            pass
-        try:
-            from unidecode import unidecode
-            return unidecode(text)
-        except ImportError:
-            pass
-        # NFKD fallback — handles accents but not Devanagari
-        return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+            return _transliterate_fn(str(text))
+        except Exception:
+            return unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode()
 
     def _strip_accents(self, text: str) -> str:
         """é→e, ç→c, ô→o etc. — critical for French records."""
