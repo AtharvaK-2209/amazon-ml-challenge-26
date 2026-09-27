@@ -1,16 +1,28 @@
 """
-address_features.py — Address feature engineering for entity resolution.
+address_features.py — Phase 4 Part 2: Address Feature Engineering
 
-Computes pairwise address similarity features, structural/numeric features,
-and component-level comparisons (house number, postal code, state, city)
-for candidate entity pairs.
+Computes a comprehensive set of pairwise address similarity and comparison features:
+- RapidFuzz similarity measures (address_fuzz_ratio, address_wratio, address_token_sort_ratio, address_token_set_ratio)
+- Jaccard token similarity (address_jaccard)
+- Word-level TF-IDF cosine similarity (address_tfidf_cosine)
+- Character n-gram TF-IDF cosine similarity (address_char_cosine)
+- Numeric token overlap (address_numeric_overlap)
+- Component comparison features (house_number_match, postal_match, city_match, state_match) using convention:
+    1  = exact match
+    0  = mismatch
+   -1  = missing / unknown
+
+Designed for scalable performance across training, validation, and test candidate pairs.
 """
 
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional, Set, Tuple
 import logging
 import re
+import numpy as np
+import pandas as pd
 from functools import lru_cache
 from rapidfuzz import fuzz, distance
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from src.preprocessing.address_parser import parse_address
 from src.config import NORM
@@ -24,13 +36,12 @@ STREET_TYPES: Set[str] = {
     "rd", "st", "ave", "blvd", "dr", "ln", "hwy", "way", "pl", "ct", "cir"
 }
 
-# Mapping of normalized street types for robust matching
 STREET_TYPE_EXPANSIONS = NORM.get("address_abbreviation_expansions", {})
 
 
 def jaccard_similarity(address1: str, address2: str) -> float:
     """
-    Compute Jaccard similarity between token sets of two addresses.
+    Compute Jaccard token similarity between two address strings.
     
     Args:
         address1: First address string
@@ -53,13 +64,6 @@ def jaccard_similarity(address1: str, address2: str) -> float:
 def levenshtein_distance(address1: str, address2: str) -> int:
     """
     Compute Levenshtein edit distance between two addresses.
-    
-    Args:
-        address1: First address string
-        address2: Second address string
-        
-    Returns:
-        Edit distance (number of operations)
     """
     if not address1 or not address2:
         return max(len(address1 or ""), len(address2 or ""))
@@ -75,14 +79,7 @@ def _extract_numbers(address: str) -> Set[str]:
 
 def numeric_match(address1: str, address2: str) -> bool:
     """
-    Check if addresses have matching numeric components.
-    
-    Args:
-        address1: First address
-        address2: Second address
-        
-    Returns:
-        True if numeric components exist and have non-empty overlap
+    Check if addresses share at least one numeric token.
     """
     nums1 = _extract_numbers(address1)
     nums2 = _extract_numbers(address2)
@@ -126,16 +123,7 @@ def _extract_street_types(address: str) -> Set[str]:
 
 
 def street_type_match(address1: str, address2: str) -> bool:
-    """
-    Check if addresses have matching street types (e.g. both 'road' or 'street').
-    
-    Args:
-        address1: First address
-        address2: Second address
-        
-    Returns:
-        True if street types match
-    """
+    """Check if addresses have matching street types."""
     st1 = _extract_street_types(address1)
     st2 = _extract_street_types(address2)
     if not st1 or not st2:
@@ -143,130 +131,117 @@ def street_type_match(address1: str, address2: str) -> bool:
     return len(st1 & st2) > 0
 
 
-def city_match(address1: str, address2: str, country1: str = "", country2: str = "") -> bool:
+def _compare_component(val1: Optional[str], val2: Optional[str]) -> int:
+    """
+    Helper for component matching following project convention:
+        1  = exact match (both non-empty & equal)
+        0  = mismatch (both non-empty & different)
+       -1  = missing / unknown (either or both missing)
+    """
+    if not val1 or not val2 or not str(val1).strip() or not str(val2).strip():
+        return -1
+    v1 = str(val1).lower().strip()
+    v2 = str(val2).lower().strip()
+    return 1 if v1 == v2 else 0
+
+
+def city_match(address1: str, address2: str, country1: str = "", country2: str = "") -> int:
     """
     Check if parsed cities match between two addresses.
-    
-    Args:
-        address1: First address
-        address2: Second address
-        country1: Country of first entity
-        country2: Country of second entity
-        
-    Returns:
-        True if parsed cities match and are non-empty
+    Returns: 1 = match, 0 = mismatch, -1 = missing
     """
     p1 = parse_address(address1, country1)
     p2 = parse_address(address2, country2)
-    c1, c2 = p1.get("city"), p2.get("city")
-    if c1 and c2:
-        return c1.lower().strip() == c2.lower().strip()
-    return False
+    return _compare_component(p1.get("city"), p2.get("city"))
 
 
-def extract_address_features(
-    address1: str,
-    address2: str,
-    country1: str = "",
-    country2: str = ""
-) -> Dict[str, float]:
+def state_match(address1: str, address2: str, country1: str = "", country2: str = "") -> int:
     """
-    Extract full set of pairwise address similarity and structural features.
-    
-    Args:
-        address1: First address string (raw or normalized)
-        address2: Second address string (raw or normalized)
-        country1: Country code/name for entity 1
-        country2: Country code/name for entity 2
-        
-    Returns:
-        Dictionary of feature name -> float value
+    Check if parsed states match between two addresses.
+    Returns: 1 = match, 0 = mismatch, -1 = missing
     """
-    a1 = str(address1 or "").strip()
-    a2 = str(address2 or "").strip()
+    p1 = parse_address(address1, country1)
+    p2 = parse_address(address2, country2)
+    return _compare_component(p1.get("state"), p2.get("state"))
+
+
+def postal_match(address1: str, address2: str, country1: str = "", country2: str = "") -> int:
+    """
+    Check if parsed postal/PIN codes match between two addresses.
+    Returns: 1 = match, 0 = mismatch, -1 = missing
+    """
+    p1 = parse_address(address1, country1)
+    p2 = parse_address(address2, country2)
+    return _compare_component(p1.get("postal_code"), p2.get("postal_code"))
+
+
+def house_number_match(address1: str, address2: str, country1: str = "", country2: str = "") -> int:
+    """
+    Check if parsed house numbers match between two addresses.
+    Returns: 1 = match, 0 = mismatch, -1 = missing
+    """
+    p1 = parse_address(address1, country1)
+    p2 = parse_address(address2, country2)
     
-    features: Dict[str, float] = {}
-
-    # 1. String & Token Similarities (RapidFuzz scaled to [0.0, 1.0])
-    if not a1 or not a2:
-        features['address_similarity'] = 0.0
-        features['address_ratio'] = 0.0
-        features['address_wratio'] = 0.0
-        features['address_partial_ratio'] = 0.0
-        features['address_token_sort_ratio'] = 0.0
-        features['address_token_set_ratio'] = 0.0
-        features['address_jaccard'] = 0.0
-        features['address_levenshtein'] = float(max(len(a1), len(a2)))
-    else:
-        ratio_val = float(fuzz.ratio(a1, a2) / 100.0)
-        wratio_val = float(fuzz.WRatio(a1, a2) / 100.0)
-        partial_val = float(fuzz.partial_ratio(a1, a2) / 100.0)
-        sort_val = float(fuzz.token_sort_ratio(a1, a2) / 100.0)
-        set_val = float(fuzz.token_set_ratio(a1, a2) / 100.0)
-        
-        features['address_ratio'] = ratio_val
-        features['address_wratio'] = wratio_val
-        features['address_partial_ratio'] = partial_val
-        features['address_token_sort_ratio'] = sort_val
-        features['address_token_set_ratio'] = set_val
-        features['address_similarity'] = wratio_val
-        features['address_jaccard'] = jaccard_similarity(a1, a2)
-        features['address_levenshtein'] = float(levenshtein_distance(a1, a2))
-
-    # 2. Structural & Numeric Features
-    features['numeric_token_overlap'] = numeric_token_overlap(a1, a2)
-    features['address_numeric_match'] = 1.0 if numeric_match(a1, a2) else 0.0
-    features['address_street_type_match'] = 1.0 if street_type_match(a1, a2) else 0.0
-
-    # 3. Component Extraction & Comparison (parse_address)
-    p1 = parse_address(a1, country1)
-    p2 = parse_address(a2, country2)
+    h1 = p1.get("house_number")
+    h2 = p2.get("house_number")
     
-    h1, h2 = p1.get("house_number"), p2.get("house_number")
-    pc1, pc2 = p1.get("postal_code"), p2.get("postal_code")
-    st1, st2 = p1.get("state"), p2.get("state")
-    c1, c2 = p1.get("city"), p2.get("city")
-
-    features['same_house_number'] = 1.0 if (h1 and h2 and h1.lower().strip() == h2.lower().strip()) else 0.0
-    features['same_postal_code'] = 1.0 if (pc1 and pc2 and pc1.lower().strip() == pc2.lower().strip()) else 0.0
-    features['same_state'] = 1.0 if (st1 and st2 and st1.lower().strip() == st2.lower().strip()) else 0.0
-    features['same_city'] = 1.0 if (c1 and c2 and c1.lower().strip() == c2.lower().strip()) else 0.0
-    features['address_city_match'] = features['same_city']
-
-    return features
+    # Fallback to leading number if parse_address yielded None
+    if not h1 and address1:
+        m = re.match(r"^\s*(\d+[a-zA-Z]?)\b", address1)
+        if m:
+            h1 = m.group(1)
+    if not h2 and address2:
+        m = re.match(r"^\s*(\d+[a-zA-Z]?)\b", address2)
+        if m:
+            h2 = m.group(1)
+            
+    return _compare_component(h1, h2)
 
 
 class AddressFeatureExtractor:
     """
-    Feature extractor class for pairwise address comparison.
+    Phase 4 - Part 2 Address Feature Extractor class.
+    Generates high-quality address features for candidate entity pairs.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
-        Initialize AddressFeatureExtractor.
-        
-        Args:
-            config: Optional configuration dictionary
+        Initialize AddressFeatureExtractor with optional configuration and TF-IDF vectorizers.
         """
         self.config = config or {}
-        self.features = self.config.get('address_features', [
-            'address_similarity',
-            'address_ratio',
-            'address_wratio',
-            'address_partial_ratio',
-            'address_token_sort_ratio',
-            'address_token_set_ratio',
-            'address_jaccard',
-            'address_levenshtein',
-            'numeric_token_overlap',
-            'address_numeric_match',
-            'address_street_type_match',
-            'same_house_number',
-            'same_postal_code',
-            'same_state',
-            'same_city',
-        ])
-        logger.info(f"Initializing AddressFeatureExtractor with {len(self.features)} features")
+        
+        # Word TF-IDF vectorizer configuration
+        self.word_vectorizer = TfidfVectorizer(
+            ngram_range=(1, 2),
+            min_df=1,
+            max_features=25000,
+            token_pattern=r"(?u)\b\w+\b"
+        )
+        
+        # Character n-gram TF-IDF vectorizer configuration
+        self.char_vectorizer = TfidfVectorizer(
+            analyzer="char_wb",
+            ngram_range=(3, 3),
+            min_df=1,
+            max_features=25000
+        )
+        
+        self.vectorizers_fitted = False
+        logger.info("Initializing AddressFeatureExtractor (Phase 4 - Part 2)")
+
+    def fit_vectorizers(self, corpus: List[str]) -> "AddressFeatureExtractor":
+        """
+        Fit word and char-level TF-IDF vectorizers on an address corpus.
+        """
+        clean_corpus = [str(a or "").strip() for a in corpus if str(a or "").strip()]
+        if not clean_corpus:
+            clean_corpus = ["dummy address"]
+            
+        self.word_vectorizer.fit(clean_corpus)
+        self.char_vectorizer.fit(clean_corpus)
+        self.vectorizers_fitted = True
+        return self
 
     def extract_features(
         self,
@@ -276,43 +251,183 @@ class AddressFeatureExtractor:
         country2: str = ""
     ) -> Dict[str, float]:
         """
-        Extract address features for a pair of addresses.
+        Extract address features for a single address pair.
         
         Args:
-            address1: First address
-            address2: Second address
-            country1: Country for address 1
-            country2: Country for address 2
+            address1: First address string
+            address2: Second address string
+            country1: Country for entity 1
+            country2: Country for entity 2
             
         Returns:
-            Dict mapping feature name to float value
+            Dictionary mapping feature names to numerical values.
         """
-        all_feats = extract_address_features(address1, address2, country1, country2)
-        # Filter according to self.features if specified, else return all
-        if self.config and 'address_features' in self.config:
-            return {k: v for k, v in all_feats.items() if k in self.features}
-        return all_feats
+        a1 = str(address1 or "").strip()
+        a2 = str(address2 or "").strip()
+
+        features: Dict[str, float] = {}
+
+        # 1. RapidFuzz Similarities [0.0, 1.0]
+        if not a1 or not a2:
+            features['address_fuzz_ratio'] = 0.0
+            features['address_wratio'] = 0.0
+            features['address_token_sort_ratio'] = 0.0
+            features['address_token_set_ratio'] = 0.0
+            features['address_similarity'] = 0.0
+            features['address_ratio'] = 0.0
+            features['address_partial_ratio'] = 0.0
+            features['address_jaccard'] = 0.0
+            features['address_levenshtein'] = float(max(len(a1), len(a2)))
+            features['address_tfidf_cosine'] = 0.0
+            features['address_char_cosine'] = 0.0
+        else:
+            fuzz_ratio = float(fuzz.ratio(a1, a2) / 100.0)
+            wratio = float(fuzz.WRatio(a1, a2) / 100.0)
+            sort_ratio = float(fuzz.token_sort_ratio(a1, a2) / 100.0)
+            set_ratio = float(fuzz.token_set_ratio(a1, a2) / 100.0)
+            partial_ratio = float(fuzz.partial_ratio(a1, a2) / 100.0)
+
+            features['address_fuzz_ratio'] = fuzz_ratio
+            features['address_wratio'] = wratio
+            features['address_token_sort_ratio'] = sort_ratio
+            features['address_token_set_ratio'] = set_ratio
+            
+            # Backward-compatible aliases
+            features['address_similarity'] = wratio
+            features['address_ratio'] = fuzz_ratio
+            features['address_partial_ratio'] = partial_ratio
+            features['address_jaccard'] = jaccard_similarity(a1, a2)
+            features['address_levenshtein'] = float(levenshtein_distance(a1, a2))
+
+            # 2. TF-IDF & Character Cosine Similarities
+            try:
+                if self.vectorizers_fitted:
+                    w_vecs = self.word_vectorizer.transform([a1, a2])
+                    c_vecs = self.char_vectorizer.transform([a1, a2])
+                    w_cos = float(w_vecs[0].dot(w_vecs[1].T).toarray()[0][0])
+                    c_cos = float(c_vecs[0].dot(c_vecs[1].T).toarray()[0][0])
+                else:
+                    # Fit dynamically on pair
+                    vec_w = TfidfVectorizer(ngram_range=(1, 2)).fit([a1, a2])
+                    vec_c = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 3)).fit([a1, a2])
+                    w_vecs = vec_w.transform([a1, a2])
+                    c_vecs = vec_c.transform([a1, a2])
+                    w_cos = float(w_vecs[0].dot(w_vecs[1].T).toarray()[0][0])
+                    c_cos = float(c_vecs[0].dot(c_vecs[1].T).toarray()[0][0])
+            except Exception:
+                w_cos = features['address_jaccard']
+                c_cos = features['address_token_sort_ratio']
+
+            features['address_tfidf_cosine'] = float(np.clip(w_cos, 0.0, 1.0))
+            features['address_char_cosine'] = float(np.clip(c_cos, 0.0, 1.0))
+
+        # 3. Numeric Overlap
+        features['address_numeric_overlap'] = numeric_token_overlap(a1, a2)
+        features['address_numeric_match'] = 1.0 if numeric_match(a1, a2) else 0.0
+        features['address_street_type_match'] = 1.0 if street_type_match(a1, a2) else 0.0
+
+        # 4. Component Comparison Features (1 = match, 0 = mismatch, -1 = missing)
+        p1 = parse_address(a1, country1)
+        p2 = parse_address(a2, country2)
+
+        h_match = house_number_match(a1, a2, country1, country2)
+        p_match = postal_match(a1, a2, country1, country2)
+        c_match = city_match(a1, a2, country1, country2)
+        s_match = state_match(a1, a2, country1, country2)
+
+        features['house_number_match'] = float(h_match)
+        features['postal_match'] = float(p_match)
+        features['city_match'] = float(c_match)
+        features['state_match'] = float(s_match)
+
+        # Boolean aliases for legacy consumers
+        features['same_house_number'] = 1.0 if h_match == 1 else 0.0
+        features['same_postal_code'] = 1.0 if p_match == 1 else 0.0
+        features['same_city'] = 1.0 if c_match == 1 else 0.0
+        features['same_state'] = 1.0 if s_match == 1 else 0.0
+        features['address_city_match'] = features['same_city']
+
+        return features
 
     def extract_features_batch(self, address_pairs: list) -> list:
         """
-        Extract features for multiple address pairs.
-        
-        Args:
-            address_pairs: List of tuples (address1, address2) or (address1, address2, country1, country2)
-            
-        Returns:
-            List of feature dictionaries
+        Extract features for a list of address pairs.
         """
+        # Collect all unique address strings to fit TF-IDF if not fitted
+        if not self.vectorizers_fitted:
+            all_addrs = []
+            for pair in address_pairs:
+                a1 = pair[0] if len(pair) > 0 else ""
+                a2 = pair[1] if len(pair) > 1 else ""
+                all_addrs.extend([str(a1 or ""), str(a2 or "")])
+            self.fit_vectorizers(all_addrs)
+
         results = []
         for pair in address_pairs:
-            if len(pair) == 4:
-                a1, a2, c1, c2 = pair
-            elif len(pair) == 2:
-                a1, a2 = pair
-                c1, c2 = "", ""
-            else:
-                a1, a2 = pair[0], pair[1]
-                c1 = pair[2] if len(pair) > 2 else ""
-                c2 = pair[3] if len(pair) > 3 else ""
+            a1 = pair[0] if len(pair) > 0 else ""
+            a2 = pair[1] if len(pair) > 1 else ""
+            c1 = pair[2] if len(pair) > 2 else ""
+            c2 = pair[3] if len(pair) > 3 else ""
             results.append(self.extract_features(a1, a2, c1, c2))
         return results
+
+    def extract_features_dataframe(
+        self,
+        df: pd.DataFrame,
+        addr1_col: str = "normalized_address_s1",
+        addr2_col: str = "normalized_address_cand",
+        country1_col: str = "country_s1",
+        country2_col: str = "country_cand"
+    ) -> pd.DataFrame:
+        """
+        Scalable vector-accelerated feature extraction for a pandas DataFrame of candidate pairs.
+        """
+        if df.empty:
+            return pd.DataFrame()
+
+        # Fit vectorizers on unique addresses in df
+        addrs1 = df[addr1_col].fillna("").astype(str).tolist() if addr1_col in df.columns else [""] * len(df)
+        addrs2 = df[addr2_col].fillna("").astype(str).tolist() if addr2_col in df.columns else [""] * len(df)
+
+        c1_list = df[country1_col].fillna("").astype(str).tolist() if country1_col in df.columns else [""] * len(df)
+        c2_list = df[country2_col].fillna("").astype(str).tolist() if country2_col in df.columns else [""] * len(df)
+
+        unique_addrs = list(set(addrs1 + addrs2))
+        if not self.vectorizers_fitted:
+            self.fit_vectorizers(unique_addrs)
+
+        # Precompute TF-IDF matrices for unique addresses
+        w_mat = self.word_vectorizer.transform(unique_addrs)
+        c_mat = self.char_vectorizer.transform(unique_addrs)
+        addr_to_idx = {addr: i for i, addr in enumerate(unique_addrs)}
+
+        rows = []
+        for a1, a2, c1, c2 in zip(addrs1, addrs2, c1_list, c2_list):
+            feats = self.extract_features(a1, a2, c1, c2)
+            
+            # Fast matrix dot-product lookup for TF-IDF similarities
+            idx1, idx2 = addr_to_idx.get(a1), addr_to_idx.get(a2)
+            if idx1 is not None and idx2 is not None and a1 and a2:
+                w_sim = float(w_mat[idx1].dot(w_mat[idx2].T).toarray()[0][0])
+                c_sim = float(c_mat[idx1].dot(c_mat[idx2].T).toarray()[0][0])
+                feats['address_tfidf_cosine'] = float(np.clip(w_sim, 0.0, 1.0))
+                feats['address_char_cosine'] = float(np.clip(c_sim, 0.0, 1.0))
+
+            rows.append(feats)
+
+        res_df = pd.DataFrame(rows)
+        return res_df.fillna(0.0)
+
+
+# Standalone function helpers
+def extract_address_features(
+    address1: str,
+    address2: str,
+    country1: str = "",
+    country2: str = ""
+) -> Dict[str, float]:
+    """
+    Extract full set of pairwise address features for two addresses.
+    """
+    extractor = AddressFeatureExtractor()
+    return extractor.extract_features(address1, address2, country1, country2)
