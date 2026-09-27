@@ -48,6 +48,18 @@ class Normalizer:
         import pandas as pd
         df = df.copy()
 
+        if df.empty:
+            df["original_name"] = ""
+            df["normalized_name"] = ""
+            df["alphanumeric_name"] = ""
+            df["tokenized_name"] = [[]] * 0
+            df["name_without_legal_suffix"] = ""
+            df["original_address"] = ""
+            df["normalized_address"] = ""
+            df["address_tokens"] = [[]] * 0
+            df["numbers"] = [[]] * 0
+            return df
+
         # Fill nulls
         df["business_name"]    = df["business_name"].fillna("").astype(str)
         df["business_address"] = df["business_address"].fillna("").astype(str)
