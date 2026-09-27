@@ -14,64 +14,66 @@ class TestImports:
     
     def test_import_config(self):
         """Test config module imports."""
-        from src.config import Config, load_config, get_config, setup_logging
+        from src.config import Config, load_config, get_config
         assert Config is not None
         assert load_config is not None
         assert get_config is not None
     
     def test_import_preprocessing(self):
         """Test preprocessing modules import."""
-        from src.preprocessing.normalize import Normalizer, normalize_business_name
-        from src.preprocessing.address_parser import AddressParser
+        from src.preprocessing.normalize import Normalizer
+        from src.preprocessing.address_parser import parse_address
         assert Normalizer is not None
-        assert AddressParser is not None
+        assert parse_address is not None
     
     def test_import_blocking(self):
         """Test blocking modules import."""
-        from src.blocking.exact_blocking import ExactBlocker
-        from src.blocking.token_blocking import TokenBlocker
-        from src.blocking.tfidf_blocking import TFIDFBlocker
-        from src.blocking.faiss_blocking import FAISSBlocker
-        assert ExactBlocker is not None
-        assert TokenBlocker is not None
-        assert TFIDFBlocker is not None
-        assert FAISSBlocker is not None
+        from src.blocking.exact_blocking import exact_block
+        from src.blocking.token_blocking import sorted_neighbourhood_block
+        from src.blocking.tfidf_blocking import tfidf_block
+        from src.blocking.faiss_blocking import faiss_block
+        assert exact_block is not None
+        assert sorted_neighbourhood_block is not None
+        assert tfidf_block is not None
+        assert faiss_block is not None
     
     def test_import_features(self):
         """Test feature modules import."""
         from src.features.name_features import NameFeatureExtractor
         from src.features.address_features import AddressFeatureExtractor
-        from src.features.pair_features import PairFeatureExtractor
+        from src.features.pair_features import PairFeatureExtractor, build_feature_matrix
         assert NameFeatureExtractor is not None
         assert AddressFeatureExtractor is not None
         assert PairFeatureExtractor is not None
+        assert build_feature_matrix is not None
     
     def test_import_models(self):
         """Test model modules import."""
-        from src.models.train_xgb import XGBoostTrainer
-        from src.models.predict import EntityPredictor
-        assert XGBoostTrainer is not None
-        assert EntityPredictor is not None
+        from src.models.train_xgb import train
+        from src.models.predict import predict_proba, predict_matches
+        assert train is not None
+        assert predict_proba is not None
+        assert predict_matches is not None
     
     def test_import_decision(self):
         """Test decision modules import."""
-        from src.decision.threshold import ThresholdDecider
-        from src.decision.margin import MarginDecider
-        from src.decision.singleton import SingletonHandler
-        assert ThresholdDecider is not None
-        assert MarginDecider is not None
-        assert SingletonHandler is not None
+        from src.decision.threshold import sweep_thresholds
+        from src.decision.margin import apply_margin_filter
+        from src.decision.singleton import build_full_submission
+        assert sweep_thresholds is not None
+        assert apply_margin_filter is not None
+        assert build_full_submission is not None
     
     def test_import_evaluation(self):
         """Test evaluation modules import."""
-        from src.evaluation.evaluate_f05 import EntityEvaluator, compute_fbeta
-        assert EntityEvaluator is not None
-        assert compute_fbeta is not None
+        from src.evaluation.evaluate_f05 import evaluate_f05, f_beta
+        assert evaluate_f05 is not None
+        assert f_beta is not None
     
     def test_import_pipeline(self):
         """Test pipeline module imports."""
-        from src.pipeline import EntityResolutionPipeline
-        assert EntityResolutionPipeline is not None
+        from src.pipeline import run_pipeline
+        assert run_pipeline is not None
 
 
 class TestProjectStructure:
@@ -80,9 +82,8 @@ class TestProjectStructure:
     def test_directory_structure(self):
         """Test that all required directories exist."""
         required_dirs = [
-            'data',
-            'data/train',
-            'data/test',
+            'train',
+            'test',
             'src',
             'src/preprocessing',
             'src/blocking',
