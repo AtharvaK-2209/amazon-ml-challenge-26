@@ -1,0 +1,11 @@
+{
+    "training_feature_count": 47,
+    "test_feature_count": 47,
+    "missing_features": [],
+    "extra_features": [],
+    "order_match": true,
+    "name_match": true,
+    "dtype_compatible": true,
+    "preprocessing_version_match": true,
+    "schema_compatible": true
+}
