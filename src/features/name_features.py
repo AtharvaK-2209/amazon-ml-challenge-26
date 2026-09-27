@@ -48,7 +48,7 @@ def _norm_edit_distance(name1: str, name2: str) -> float:
     if not name1 or not name2:
         return 0.0
     max_len = max(len(name1), len(name2))
-    dist = fuzz.distance(name1, name2)
+    dist = distance.Levenshtein.distance(name1, name2)
     return max(0.0, 1.0 - (dist / max_len))
 
 
