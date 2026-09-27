@@ -1,0 +1,30 @@
+{
+    "baseline": {
+        "precision": 0.997526,
+        "recall": 0.979951,
+        "f0_5": 0.993961,
+        "f1": 0.988661,
+        "fp": 4,
+        "fn": 33
+    },
+    "hard_negative_experiment": {
+        "precision": 0.997531,
+        "recall": 0.981774,
+        "f0_5": 0.994339,
+        "f1": 0.98959,
+        "fp": 4,
+        "fn": 30
+    },
+    "experiment_metadata": {
+        "experiment_id": "EXP_HN_MEMBER2_01",
+        "experiment_name": "Controlled Hard Negative Oversampling (10% Ratio)",
+        "hard_negative_ratio": 0.1,
+        "hard_negative_count": 938,
+        "original_negative_count": 93776,
+        "total_training_examples": 103154,
+        "positive_count": 9378,
+        "negative_count": 93776,
+        "model_configuration": "XGBClassifier(n_estimators=500, max_depth=6, lr=0.05)",
+        "random_seed": 42
+    }
+}
