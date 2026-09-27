@@ -28,9 +28,9 @@ MANIFEST
 
 # Large data and intermediate files
 student_resource/dataset/
-features/
-output/
-experiments/
+/features/
+/output/
+/experiments/
 src/models/saved/
 eda_output/plots/
 *.parquet

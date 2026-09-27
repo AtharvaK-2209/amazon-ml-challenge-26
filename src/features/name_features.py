@@ -1,193 +1,137 @@
 """
-Business name feature engineering for entity resolution.
-
-This module computes similarity features between business name pairs
-to support entity matching decisions.
+name_features.py — Phase 4: Business name pairwise features.
+Extracts a small, purposeful set of character and token similarity features
+between two business names. Handles missing values deterministically.
 """
 
 from typing import Dict, Any, Optional
-import logging
+import math
+from rapidfuzz import fuzz
 
-logger = logging.getLogger(__name__)
+def _clean_str(s: Any) -> str:
+    """Safely cast to string and clean."""
+    if s is None:
+        return ""
+    # Treat pd.NA or np.nan as empty string
+    try:
+        if math.isnan(s):
+            return ""
+    except TypeError:
+        pass
+    
+    val = str(s).strip()
+    # Treat "nan" or "none" strings (which can happen in pandas) as empty
+    if val.lower() in ("nan", "none", "<na>"):
+        return ""
+    return val
 
+def _jaccard(tokens1: list, tokens2: list) -> float:
+    """Jaccard similarity between two token lists."""
+    set1, set2 = set(tokens1), set(tokens2)
+    if not set1 and not set2:
+        return 1.0
+    if not set1 or not set2:
+        return 0.0
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union
 
-def jaccard_similarity(
+def _norm_edit_distance(name1: str, name2: str) -> float:
+    """Normalized edit distance: 1.0 - (edit_distance / max_len)."""
+    if not name1 and not name2:
+        return 1.0
+    if not name1 or not name2:
+        return 0.0
+    max_len = max(len(name1), len(name2))
+    distance = fuzz.distance(name1, name2)
+    return max(0.0, 1.0 - (distance / max_len))
+
+def extract_name_features(
     name1: str,
-    name2: str
-) -> float:
+    name2: str,
+    suffix1: Optional[str] = None,
+    suffix2: Optional[str] = None
+) -> Dict[str, float]:
     """
-    Compute Jaccard similarity between two business names.
+    Compute pairwise similarity features for business names.
     
     Args:
-        name1: First business name
-        name2: Second business name
+        name1: S1 normalized business name
+        name2: S2/S3 normalized business name
+        suffix1: Extracted legal suffix for S1 (optional)
+        suffix2: Extracted legal suffix for S2/S3 (optional)
         
     Returns:
-        Jaccard similarity score in [0, 1]
-        
-    TODO: Implement in Phase 1
+        Dictionary of feature names to deterministic float values.
     """
-    return 0.0
-
-
-def levenshtein_distance(
-    name1: str,
-    name2: str
-) -> int:
-    """
-    Compute Levenshtein edit distance between two business names.
+    n1 = _clean_str(name1)
+    n2 = _clean_str(name2)
     
-    Args:
-        name1: First business name
-        name2: Second business name
-        
-    Returns:
-        Edit distance (number of operations)
-        
-    TODO: Implement in Phase 1
-    """
-    return 0
-
-
-def token_sort_ratio(
-    name1: str,
-    name2: str
-) -> float:
-    """
-    Compute token sort ratio similarity between two business names.
+    features = {}
     
-    Tokenizes both strings, sorts the tokens, and computes similarity.
-    Handles word reordering issues.
+    # Missing value flags
+    features["name_s1_missing"] = 1.0 if not n1 else 0.0
+    features["name_s2_missing"] = 1.0 if not n2 else 0.0
     
-    Args:
-        name1: First business name
-        name2: Second business name
-        
-    Returns:
-        Similarity ratio in [0, 100]
-        
-    TODO: Implement in Phase 1
-    """
-    return 0.0
-
-
-def partial_ratio(
-    name1: str,
-    name2: str
-) -> float:
-    """
-    Compute partial ratio similarity between two business names.
-    
-    Finds the best matching substring and computes similarity.
-    Useful for matching substrings within longer names.
-    
-    Args:
-        name1: First business name
-        name2: Second business name
-        
-    Returns:
-        Similarity ratio in [0, 100]
-        
-    TODO: Implement in Phase 1
-    """
-    return 0.0
-
-
-def acronym_match(
-    name1: str,
-    name2: str
-) -> bool:
-    """
-    Check if either name is an acronym of the other.
-    
-    Example: "ABC Corp" matches "ABC"
-    
-    Args:
-        name1: First business name
-        name2: Second business name
-        
-    Returns:
-        True if acronym match found
-        
-    TODO: Implement in Phase 1
-    """
-    return False
-
-
-class NameFeatureExtractor:
-    """
-    Feature extractor for business name pairs.
-    
-    Computes a comprehensive set of similarity features between
-    business names for entity matching.
-    """
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize name feature extractor.
-        
-        Args:
-            config: Feature configuration parameters
-        """
-        self.config = config or {}
-        self.features = self.config.get('name_features', [
-            'jaccard_similarity',
-            'levenshtein_distance',
-            'token_sort_ratio',
-            'partial_ratio',
-            'acronym_match'
-        ])
-        logger.info(f"Initializing NameFeatureExtractor with {len(self.features)} features")
-    
-    def extract_features(
-        self,
-        name1: str,
-        name2: str
-    ) -> Dict[str, float]:
-        """
-        Extract name similarity features for a name pair.
-        
-        Args:
-            name1: First business name
-            name2: Second business name
-            
-        Returns:
-            Dictionary of feature name -> feature value
-            
-        TODO: Implement in Phase 1
-        """
-        features = {}
-        
-        if 'jaccard_similarity' in self.features:
-            features['name_jaccard'] = jaccard_similarity(name1, name2)
-        
-        if 'levenshtein_distance' in self.features:
-            features['name_levenshtein'] = float(levenshtein_distance(name1, name2))
-        
-        if 'token_sort_ratio' in self.features:
-            features['name_token_sort'] = token_sort_ratio(name1, name2)
-        
-        if 'partial_ratio' in self.features:
-            features['name_partial_ratio'] = partial_ratio(name1, name2)
-        
-        if 'acronym_match' in self.features:
-            features['name_acronym_match'] = float(acronym_match(name1, name2))
-        
+    if not n1 or not n2:
+        # Fallback values when one or both are missing
+        features["name_ratio"] = 1.0 if (not n1 and not n2) else 0.0
+        features["name_token_sort"] = features["name_ratio"]
+        features["name_jaccard"] = features["name_ratio"]
+        features["name_norm_edit"] = features["name_ratio"]
+        features["name_len_ratio"] = 1.0 if (not n1 and not n2) else 0.0
+        features["same_legal_suffix"] = 0.0
         return features
+
+    # Character similarities (using RapidFuzz for speed)
+    # fuzz.ratio is standard Levenshtein-based similarity
+    features["name_ratio"] = fuzz.ratio(n1, n2) / 100.0
     
-    def extract_features_batch(
-        self,
-        name_pairs: list
-    ) -> list:
-        """
-        Extract features for multiple name pairs.
+    # fuzz.token_sort_ratio handles token reordering (e.g. "ABC Corp" vs "Corp ABC")
+    features["name_token_sort"] = fuzz.token_sort_ratio(n1, n2) / 100.0
+    
+    features["name_norm_edit"] = _norm_edit_distance(n1, n2)
+    
+    # Token features
+    t1 = n1.split()
+    t2 = n2.split()
+    features["name_jaccard"] = _jaccard(t1, t2)
+    
+    # Structural/length features
+    # Min length / Max length. Prevents division by zero.
+    len1, len2 = len(n1), len(n2)
+    features["name_len_ratio"] = min(len1, len2) / max(len1, len2)
+    
+    # Suffix features
+    if suffix1 is not None and suffix2 is not None:
+        s1 = _clean_str(suffix1)
+        s2 = _clean_str(suffix2)
+        if s1 and s2:
+            features["same_legal_suffix"] = 1.0 if s1 == s2 else 0.0
+        else:
+            features["same_legal_suffix"] = 0.0
+    else:
+        features["same_legal_suffix"] = 0.0
         
-        Args:
-            name_pairs: List of (name1, name2) tuples
-            
-        Returns:
-            List of feature dictionaries
-            
-        TODO: Implement in Phase 1
-        """
-        return [self.extract_features(n1, n2) for n1, n2 in name_pairs]
+    return features
+
+def extract_name_features_batch(
+    name_pairs: list,
+    suffix_pairs: Optional[list] = None
+) -> list:
+    """
+    Extract features for multiple name pairs.
+    
+    Args:
+        name_pairs: List of (name1, name2) tuples
+        suffix_pairs: Optional list of (suffix1, suffix2) tuples
+        
+    Returns:
+        List of feature dictionaries
+    """
+    if suffix_pairs:
+        return [
+            extract_name_features(n1, n2, s1, s2)
+            for (n1, n2), (s1, s2) in zip(name_pairs, suffix_pairs)
+        ]
+    return [extract_name_features(n1, n2) for n1, n2 in name_pairs]
