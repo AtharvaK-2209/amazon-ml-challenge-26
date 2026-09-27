@@ -1,0 +1,11 @@
+{
+    "total_true_matches": 1751,
+    "true_matches_in_candidate_set": 1646,
+    "true_matches_missing_from_candidate_set": 105,
+    "blocking_recall": 0.940034,
+    "recall_by_blocker": {
+        "tfidf_blocker": 0.8875,
+        "exact_blocker": 0.742,
+        "sorted_neighbourhood_blocker": 0.621
+    }
+}
