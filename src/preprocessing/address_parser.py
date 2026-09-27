@@ -80,6 +80,17 @@ def _parse_us(addr: str, r: dict):
             r["state"] = tok.upper()
             break
 
+    # City extraction: token/part preceding state if comma-separated
+    parts = [p.strip() for p in addr.split(",") if p.strip()]
+    if len(parts) >= 2 and r["state"]:
+        for i in range(len(parts)-1, 0, -1):
+            if any(tok == r["state"].lower() for tok in parts[i].lower().split()):
+                candidate_city = parts[i-1]
+                # Filter out house numbers or long street lines if needed
+                if candidate_city and not candidate_city.isdigit():
+                    r["city"] = candidate_city
+                break
+
 
 def _parse_india(addr: str, r: dict):
     # PIN code
