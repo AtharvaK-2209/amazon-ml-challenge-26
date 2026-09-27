@@ -1,0 +1,5 @@
+s1_entity_id,candidate_entity_id,probability,true_label,fp_category,name_similarity,address_similarity,postal_match,country_match,notes
+S1-617270478,S2-758463856,0.993357,0,"Similar names, different entities",0.8788,0.855,-1,1,"Highly similar branch/franchise names in close proximity, but distinct legal entities."
+S1-1727907,S2-245404125,0.904936,0,Other false positive,0.6667,0.855,-1,1,Near-match candidate scoring above threshold.
+S1-486510827,S3-310652005,0.813273,0,Postal/House-number mismatch,0.8291,0.6451,-1,1,Same city/region but explicit disagreement in postal code or house number.
+S1-509332273,S2-213347281,0.704522,0,Other false positive,0.8125,0.6064,-1,1,Near-match candidate scoring above threshold.
