@@ -1,0 +1,149 @@
+# Amazon ML Challenge 2026 - Entity Resolution Pipeline Configuration
+# ================================================================
+
+# Random seed for reproducibility
+random_seed: 42
+
+# Data paths
+data:
+  # Local data directories
+  train_dir: data/train
+  test_dir: data/test
+  output_dir: output
+  
+  # AWS S3 configuration (placeholders - configure via environment variables)
+  use_s3: false
+  s3_bucket: ${S3_BUCKET}
+  s3_prefix: ${S3_PREFIX}
+  s3_train_path: ${S3_PREFIX}/train
+  s3_test_path: ${S3_PREFIX}/test
+  s3_output_path: ${S3_PREFIX}/output
+
+# Country handling
+country:
+  # Countries are open-set - do not hard-code specific countries
+  normalize_country_names: true
+  handle_unknown_countries: true
+
+# Preprocessing configuration
+preprocessing:
+  normalize_text: true
+  parse_addresses: true
+  lowercase: true
+  remove_special_chars: true
+  strip_whitespace: true
+
+# Blocking configuration
+blocking:
+  # Multi-pass blocking strategy
+  passes:
+    - name: exact_match
+      type: exact
+      enabled: true
+      fields:
+        - business_name
+        - business_address
+    
+    - name: token_overlap
+      type: token
+      enabled: true
+      min_overlap: 2
+    
+    - name: tfidf_similarity
+      type: tfidf
+      enabled: true
+      similarity_threshold: 0.7
+      max_candidates: 100
+    
+    - name: faiss_nearest
+      type: faiss
+      enabled: true
+      k_neighbors: 50
+      use_gpu: false
+
+  # TF-IDF specific parameters
+  tfidf:
+    max_features: 10000
+    ngram_range: [1, 2]
+    min_df: 1
+    max_df: 0.95
+  
+  # FAISS specific parameters
+  faiss:
+    index_type: IndexFlatIP  # Inner product for cosine similarity
+    nlist: 100  # Number of clusters for IVF indices
+    nprobe: 10  # Number of clusters to search
+
+# Feature engineering configuration
+features:
+  name_features:
+    - jaccard_similarity
+    - levenshtein_distance
+    - token_sort_ratio
+    - partial_ratio
+    - acronym_match
+  
+  address_features:
+    - jaccard_similarity
+    - levenshtein_distance
+    - numeric_match
+    - street_type_match
+    - city_match
+  
+  pair_features:
+    - country_match
+    - name_address_cross
+    - combined_similarity
+
+# XGBoost model configuration
+model:
+  xgboost:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    objective: binary:logistic
+    eval_metric: aucpr
+    early_stopping_rounds: 20
+    n_jobs: -1
+    random_state: 42
+  
+  calibration:
+    method: isotonic  # or 'sigmoid' for Platt scaling
+    cv_folds: 5
+
+# Decision engine configuration
+decision:
+  # Precision-first thresholds
+  match_threshold: 0.85  # Base probability threshold
+  margin_threshold: 0.15  # Minimum gap to second-best candidate
+  
+  # Singleton handling
+  singleton_detection: true
+  singleton_threshold: 0.3  # Below this, treat as no-match
+  
+  # Entity-level aggregation
+  aggregation_method: confidence_weighted
+
+# Evaluation configuration
+evaluation:
+  metric: f0.5  # Competition metric
+  beta: 0.5  # F-beta parameter (precision-weighted)
+  validation_split: 0.2
+  cross_validation_folds: 5
+  
+  # Logging during evaluation
+  log_confusion_matrix: true
+  log_per_entity_results: true
+
+# Logging configuration
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_to_file: true
+  log_file: logs/pipeline.log
+  log_to_console: true
+
+# AWS region (configure via environment variable)
+aws_region: ${AWS_REGION}
