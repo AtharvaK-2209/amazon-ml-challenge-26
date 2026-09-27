@@ -1,0 +1,12 @@
+# Amazon ML Challenge 2026 — Entity Resolution Requirements
+python_version >= 3.10
+pandas==2.2.3
+numpy==2.1.2
+scikit-learn==1.6.1
+rapidfuzz==3.12.2
+scipy==1.15.1
+xgboost==2.1.4
+joblib==1.4.2
+pyarrow==19.0.1
+tabulate==0.10.0
+pyyaml==6.0.2

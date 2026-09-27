@@ -28,6 +28,7 @@ MANIFEST
 
 # Large data and intermediate files
 student_resource/dataset/
+dataset/
 /features/
 output/
 experiments/
@@ -55,3 +56,6 @@ venv.bak/
 *.swp
 *~
 *.zip
+scratch/
+AmazonMLChallenge2026_Atharva_submission/
+Model Mavericks_submission/
