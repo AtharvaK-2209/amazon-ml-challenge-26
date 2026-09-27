@@ -1,0 +1,65 @@
+{
+    "data_info": {
+        "total_s1_rows": 1732544,
+        "unique_s1_ids": 1732544,
+        "dup_s1_count": 0,
+        "null_s1_count": 0,
+        "malformed_s1_count": 0,
+        "expected_unique_s1_entities": 1732544,
+        "s2_count": 4887273,
+        "s3_count": 5082316,
+        "total_candidates_universe": 9969589
+    },
+    "candidate_info": {
+        "min_cands": 0,
+        "max_cands": 716,
+        "mean_cands": 0.4679,
+        "median_cands": 0.0,
+        "zero_cands_count": 1725208,
+        "zero_cands_pct": 99.58,
+        "distribution_table": [
+            {
+                "Candidate Count": "0",
+                "Number of S1": 1725208,
+                "Percentage": 99.58
+            },
+            {
+                "Candidate Count": "1",
+                "Number of S1": 759,
+                "Percentage": 0.04
+            },
+            {
+                "Candidate Count": "2",
+                "Number of S1": 486,
+                "Percentage": 0.03
+            },
+            {
+                "Candidate Count": "3\u20135",
+                "Number of S1": 750,
+                "Percentage": 0.04
+            },
+            {
+                "Candidate Count": ">5",
+                "Number of S1": 5341,
+                "Percentage": 0.31
+            }
+        ]
+    },
+    "output_info": {
+        "expected_s1": 1732544,
+        "output_total_rows": 1732544,
+        "output_unique_s1": 1732544,
+        "missing_s1_count": 0,
+        "extra_s1_count": 0,
+        "duplicate_s1_rows": 0,
+        "matched_s1_count": 7336,
+        "unmatched_s1_count": 1725208,
+        "match_rate": 0.004234,
+        "match_rate_pct": 0.4234,
+        "s2_match_count": 387275,
+        "s3_match_count": 423342,
+        "invalid_match_ids_count": 0,
+        "malformed_empty_matches_count": 0
+    },
+    "official_validator_passed": true
+}
