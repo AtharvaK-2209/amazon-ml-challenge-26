@@ -28,7 +28,7 @@ MANIFEST
 
 # Large data and intermediate files
 student_resource/dataset/
-features/
+/features/
 output/
 experiments/
 src/models/saved/
