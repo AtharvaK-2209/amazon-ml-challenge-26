@@ -1,0 +1,34 @@
+{
+    "total_candidate_pairs": 29023,
+    "min_probability": 8.20836066850461e-06,
+    "max_probability": 0.018399227410554886,
+    "mean_probability": 0.00017714993737172335,
+    "median_probability": 2.991650217154529e-05,
+    "std_probability": 0.0007018358446657658,
+    "quantiles_p5_p25_p50_p75_p95": [
+        1.1329648168612039e-05,
+        2.0449375369935296e-05,
+        2.991650217154529e-05,
+        6.965502689126879e-05,
+        0.0006617816165089607
+    ],
+    "nan_count": 0,
+    "inf_count": 0,
+    "above_threshold_0_94": 0,
+    "probability_buckets": {
+        "0.0-0.1": 29023,
+        "0.1-0.2": 0,
+        "0.2-0.3": 0,
+        "0.3-0.4": 0,
+        "0.4-0.5": 0,
+        "0.5-0.6": 0,
+        "0.6-0.7": 0,
+        "0.7-0.8": 0,
+        "0.8-0.9": 0,
+        "0.9-1.0": 0
+    },
+    "inference_runtime_seconds": 0.766923189163208,
+    "phase5_threshold": 0.94,
+    "phase5_margin": 0.0,
+    "calibration_method": "raw"
+}
