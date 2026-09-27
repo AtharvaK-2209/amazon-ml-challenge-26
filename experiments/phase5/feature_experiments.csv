@@ -1,0 +1,5 @@
+experiment_id,feature_added,precision,recall,f0_5,f1,fp_count,fn_count,notes
+EXP-01,Baseline Features (Phase 4),0.997526,0.979951,0.993961,0.988661,4,33,Validation split score
+EXP-02,Baseline + exact_name_match,0.996908,0.979344,0.993345,0.988048,5,34,Validation split score
+EXP-03,Baseline + disagreement_penalty,0.997526,0.979951,0.993961,0.988661,4,33,Validation split score
+EXP-04,Baseline + All Targeted Features,0.997532,0.982382,0.994465,0.989899,4,29,Validation split score
