@@ -1,7 +1,11 @@
 import pandas as pd
+import numpy as np
 import xgboost as xgb
+import joblib
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Union
+from src.config import MODELS_DIR
+
 
 class BaselinePredictor:
     """
@@ -30,20 +34,63 @@ class BaselinePredictor:
             Tuple of (probabilities, binary_predictions)
         """
         X = feature_df[feature_cols].copy()
-        # Ensure NaNs are safely handled before prediction
         X.fillna(-999, inplace=True)
-        
-        # Generate positive class probability
         probs = self.model.predict_proba(X)[:, 1]
-        
-        # Generate binary predictions using the default threshold
         preds = (probs >= threshold).astype(int)
-        
         return probs, preds
 
+
+def predict_proba(features_df: pd.DataFrame,
+                  model_path: Optional[Union[str, Path]] = None) -> np.ndarray:
+    """
+    Run trained XGBoost model on a feature DataFrame.
+    Returns array of shape (N,) with match probabilities.
+    """
+    path = Path(model_path) if model_path else (MODELS_DIR / "xgb_baseline.json")
+    if not path.exists():
+        path = MODELS_DIR / "model_v1.joblib"
+    
+    if path.suffix == ".json":
+        clf = xgb.XGBClassifier()
+        clf.load_model(path)
+        meta_cols = ["source1_entity_id", "candidate_entity_id", "label", "candidate_source", "y_true"]
+        feature_cols = [c for c in features_df.columns if c not in meta_cols]
+        X = features_df[feature_cols].fillna(-999)
+        return clf.predict_proba(X)[:, 1]
+    else:
+        clf = joblib.load(path)
+        meta_cols = ["source1_entity_id", "candidate_entity_id", "label", "candidate_source", "y_true"]
+        feature_cols = [c for c in features_df.columns if c not in meta_cols]
+        return clf.predict_proba(features_df[feature_cols].values)[:, 1]
+
+
+def predict_matches(candidates_df: pd.DataFrame,
+                    features_df: pd.DataFrame,
+                    threshold: float = 0.70,
+                    model_path: Optional[Union[str, Path]] = None) -> pd.DataFrame:
+    """
+    Full prediction pipeline:
+    1. Score all candidate pairs
+    2. Apply threshold
+    3. Return matching_results DataFrame: [source1_entity_id, matched_entity_ids]
+    """
+    scores = predict_proba(features_df, model_path)
+    candidates_df = candidates_df.copy()
+    candidates_df["match_score"] = scores
+
+    matched = candidates_df[candidates_df["match_score"] >= threshold]
+
+    results = (
+        matched
+        .groupby("source1_entity_id")["candidate_entity_id"]
+        .apply(lambda ids: ",".join(ids.tolist()))
+        .reset_index()
+        .rename(columns={"candidate_entity_id": "matched_entity_ids"})
+    )
+    return results
+
+
 if __name__ == "__main__":
-    import numpy as np
-    # Quick ad-hoc test
     predictor = BaselinePredictor()
     try:
         predictor.load_model()
