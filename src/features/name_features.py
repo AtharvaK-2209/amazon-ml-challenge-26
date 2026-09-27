@@ -1,18 +1,17 @@
 """
 name_features.py — Phase 4: Business name pairwise features.
-Extracts a small, purposeful set of character and token similarity features
-between two business names. Handles missing values deterministically.
+Implements the 11 exact requested business name similarity features.
 """
 
 from typing import Dict, Any, Optional
 import math
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, distance
+import numpy as np
 
 def _clean_str(s: Any) -> str:
     """Safely cast to string and clean."""
     if s is None:
         return ""
-    # Treat pd.NA or np.nan as empty string
     try:
         if math.isnan(s):
             return ""
@@ -20,118 +19,108 @@ def _clean_str(s: Any) -> str:
         pass
     
     val = str(s).strip()
-    # Treat "nan" or "none" strings (which can happen in pandas) as empty
     if val.lower() in ("nan", "none", "<na>"):
         return ""
     return val
 
 def _jaccard(tokens1: list, tokens2: list) -> float:
-    """Jaccard similarity between two token lists."""
+    """Token-level Jaccard similarity: |A ∩ B| / |A ∪ B|."""
     set1, set2 = set(tokens1), set(tokens2)
     if not set1 and not set2:
         return 1.0
     if not set1 or not set2:
         return 0.0
-    intersection = len(set1 & set2)
-    union = len(set1 | set2)
-    return intersection / union
+    return len(set1 & set2) / len(set1 | set2)
 
-def _norm_edit_distance(name1: str, name2: str) -> float:
-    """Normalized edit distance: 1.0 - (edit_distance / max_len)."""
-    if not name1 and not name2:
-        return 1.0
-    if not name1 or not name2:
-        return 0.0
-    max_len = max(len(name1), len(name2))
-    distance = fuzz.distance(name1, name2)
-    return max(0.0, 1.0 - (distance / max_len))
-
-def extract_name_features(
-    name1: str,
-    name2: str,
-    suffix1: Optional[str] = None,
-    suffix2: Optional[str] = None
+def generate_name_features(
+    s1_name: str,
+    candidate_name: str,
+    tfidf_vectorizer=None,
+    char_vectorizer=None
 ) -> Dict[str, float]:
     """
     Compute pairwise similarity features for business names.
     
     Args:
-        name1: S1 normalized business name
-        name2: S2/S3 normalized business name
-        suffix1: Extracted legal suffix for S1 (optional)
-        suffix2: Extracted legal suffix for S2/S3 (optional)
+        s1_name: Phase 2 normalized name for S1.
+        candidate_name: Phase 2 normalized name for candidate (S2/S3).
+        tfidf_vectorizer: Pre-fit sklearn TfidfVectorizer (word-level).
+        char_vectorizer: Pre-fit sklearn TfidfVectorizer (char-level).
         
     Returns:
-        Dictionary of feature names to deterministic float values.
+        Dictionary of 11 required feature names to deterministic float values.
     """
-    n1 = _clean_str(name1)
-    n2 = _clean_str(name2)
+    n1 = _clean_str(s1_name)
+    n2 = _clean_str(candidate_name)
     
     features = {}
     
-    # Missing value flags
-    features["name_s1_missing"] = 1.0 if not n1 else 0.0
-    features["name_s2_missing"] = 1.0 if not n2 else 0.0
+    # 1. name_levenshtein
+    features["name_levenshtein"] = float(distance.Levenshtein.distance(n1, n2))
     
+    if not n1 and not n2:
+        features["name_fuzz_ratio"] = 100.0
+        features["name_wratio"] = 100.0
+        features["name_token_sort_ratio"] = 100.0
+        features["name_token_set_ratio"] = 100.0
+        features["name_jaccard"] = 1.0
+        features["name_tfidf_cosine"] = 1.0
+        features["name_char_cosine"] = 1.0
+        features["name_length_diff"] = 0.0
+        features["name_length_ratio"] = 1.0
+        features["name_token_count_diff"] = 0.0
+        return features
+        
     if not n1 or not n2:
-        # Fallback values when one or both are missing
-        features["name_ratio"] = 1.0 if (not n1 and not n2) else 0.0
-        features["name_token_sort"] = features["name_ratio"]
-        features["name_jaccard"] = features["name_ratio"]
-        features["name_norm_edit"] = features["name_ratio"]
-        features["name_len_ratio"] = 1.0 if (not n1 and not n2) else 0.0
-        features["same_legal_suffix"] = 0.0
+        features["name_fuzz_ratio"] = 0.0
+        features["name_wratio"] = 0.0
+        features["name_token_sort_ratio"] = 0.0
+        features["name_token_set_ratio"] = 0.0
+        features["name_jaccard"] = 0.0
+        features["name_tfidf_cosine"] = 0.0
+        features["name_char_cosine"] = 0.0
+        features["name_length_diff"] = float(abs(len(n1) - len(n2)))
+        features["name_length_ratio"] = 0.0
+        
+        t1, t2 = n1.split(), n2.split()
+        features["name_token_count_diff"] = float(abs(len(t1) - len(t2)))
         return features
 
-    # Character similarities (using RapidFuzz for speed)
-    # fuzz.ratio is standard Levenshtein-based similarity
-    features["name_ratio"] = fuzz.ratio(n1, n2) / 100.0
+    # RapidFuzz returns [0, 100]
+    features["name_fuzz_ratio"] = fuzz.ratio(n1, n2)
+    features["name_wratio"] = fuzz.WRatio(n1, n2)
+    features["name_token_sort_ratio"] = fuzz.token_sort_ratio(n1, n2)
+    features["name_token_set_ratio"] = fuzz.token_set_ratio(n1, n2)
     
-    # fuzz.token_sort_ratio handles token reordering (e.g. "ABC Corp" vs "Corp ABC")
-    features["name_token_sort"] = fuzz.token_sort_ratio(n1, n2) / 100.0
-    
-    features["name_norm_edit"] = _norm_edit_distance(n1, n2)
-    
-    # Token features
-    t1 = n1.split()
-    t2 = n2.split()
+    # Jaccard
+    t1, t2 = n1.split(), n2.split()
     features["name_jaccard"] = _jaccard(t1, t2)
     
-    # Structural/length features
-    # Min length / Max length. Prevents division by zero.
+    # Length features
     len1, len2 = len(n1), len(n2)
-    features["name_len_ratio"] = min(len1, len2) / max(len1, len2)
+    features["name_length_diff"] = float(abs(len1 - len2))
+    features["name_length_ratio"] = float(min(len1, len2) / max(len1, len2))
+    features["name_token_count_diff"] = float(abs(len(t1) - len(t2)))
     
-    # Suffix features
-    if suffix1 is not None and suffix2 is not None:
-        s1 = _clean_str(suffix1)
-        s2 = _clean_str(suffix2)
-        if s1 and s2:
-            features["same_legal_suffix"] = 1.0 if s1 == s2 else 0.0
-        else:
-            features["same_legal_suffix"] = 0.0
-    else:
-        features["same_legal_suffix"] = 0.0
-        
-    return features
+    # TF-IDF Cosine (Word)
+    features["name_tfidf_cosine"] = 0.0
+    if tfidf_vectorizer is not None:
+        try:
+            vecs = tfidf_vectorizer.transform([n1, n2])
+            # v1 * v2^T since vectors are L2 normalized by default
+            cos = (vecs[0] @ vecs[1].T).toarray()[0][0]
+            features["name_tfidf_cosine"] = float(cos)
+        except Exception:
+            features["name_tfidf_cosine"] = 0.0
 
-def extract_name_features_batch(
-    name_pairs: list,
-    suffix_pairs: Optional[list] = None
-) -> list:
-    """
-    Extract features for multiple name pairs.
-    
-    Args:
-        name_pairs: List of (name1, name2) tuples
-        suffix_pairs: Optional list of (suffix1, suffix2) tuples
-        
-    Returns:
-        List of feature dictionaries
-    """
-    if suffix_pairs:
-        return [
-            extract_name_features(n1, n2, s1, s2)
-            for (n1, n2), (s1, s2) in zip(name_pairs, suffix_pairs)
-        ]
-    return [extract_name_features(n1, n2) for n1, n2 in name_pairs]
+    # TF-IDF Cosine (Char)
+    features["name_char_cosine"] = 0.0
+    if char_vectorizer is not None:
+        try:
+            vecs = char_vectorizer.transform([n1, n2])
+            cos = (vecs[0] @ vecs[1].T).toarray()[0][0]
+            features["name_char_cosine"] = float(cos)
+        except Exception:
+            features["name_char_cosine"] = 0.0
+            
+    return features
