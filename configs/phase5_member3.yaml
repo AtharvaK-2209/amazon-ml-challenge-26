@@ -1,0 +1,26 @@
+# Amazon ML Challenge 2026 - Phase 5 Member 3 Experiment Configuration
+# ====================================================================
+
+random_seed: 42
+
+paths:
+  input_predictions: "experiments/phase5/member3/working_validation_predictions.parquet"
+  output_dir: "experiments/phase5/member3/"
+  feature_train: "features/train_features.parquet"
+  feature_val: "features/validation_features.parquet"
+
+optimization:
+  threshold_min: 0.50
+  threshold_max: 0.99
+  threshold_step: 0.01
+  
+  margin_min: 0.00
+  margin_max: 0.30
+  margin_step: 0.02
+
+calibration:
+  methods:
+    - raw
+    - platt
+    - isotonic
+  cv_folds: 5
