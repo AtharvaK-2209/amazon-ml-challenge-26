@@ -1,0 +1,4 @@
+rule,s2_positives,s3_positives,precision,recall,f05,tp,fp,fn
+Pure Probability (Baseline),775,871,1.0,0.974484,0.99479,1604,0,42
+S2 Priority Penalty,775,871,1.0,0.464156,0.81242,764,0,882
+S3 Priority Penalty,775,871,1.0,0.510328,0.838993,840,0,806

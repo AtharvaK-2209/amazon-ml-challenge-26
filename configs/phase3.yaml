@@ -1,0 +1,42 @@
+# Amazon ML Challenge 2026 — Phase 3 Configuration
+# Infrastructure & Feature Engineering Pipeline Config
+
+project:
+  name: "Amazon ML Challenge 2026"
+  phase: 3
+  random_seed: 42
+
+input:
+  # Candidate pair file path (Phase 2 output)
+  candidate_pairs: "output/phase2/candidate_pairs.tsv"
+  data_dir: "data/"
+  split: "test"
+
+features:
+  name: true
+  address: true
+  cross_field: true
+
+validation:
+  fail_on_row_mismatch: true
+  check_infinite: true
+  check_missingness: true
+  check_cardinality: true
+
+output:
+  local_dir: "output/phase3/"
+  parquet_file: "output/phase3/pair_features.parquet"
+  metadata_file: "output/phase3/feature_metadata.json"
+  format: "parquet"
+
+aws:
+  bucket: "amazon-ml-challenge-2026-atharva"
+  region: "ap-south-1"
+  profile: "amazon-ml"
+  s3_candidates_path: "candidates/phase2/candidate_pairs.tsv"
+  s3_features_prefix: "features/phase3/"
+
+experiments:
+  experiment_id: "EXP-001"
+  tracking_file: "experiments/phase3/experiments.csv"
+  s3_prefix: "experiments/phase3/"

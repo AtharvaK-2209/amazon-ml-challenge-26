@@ -1,213 +1,143 @@
 """
-Business name feature engineering for entity resolution.
-
-This module computes similarity features between business name pairs
-to support entity matching decisions.
+name_features.py — Phase 4: Business name pairwise features.
+Implements the 11 exact requested business name similarity features.
 """
 
-from typing import Dict, Any, List, Optional
-import logging
-import re
+from typing import Dict, Any, Optional
+import math
 from rapidfuzz import fuzz, distance
+import numpy as np
 
-logger = logging.getLogger(__name__)
-
-
-def jaccard_similarity(name1: str, name2: str) -> float:
-    """
-    Compute Jaccard similarity between token sets of two business names.
+def _clean_str(s: Any) -> str:
+    """Safely cast to string and clean."""
+    if s is None:
+        return ""
+    try:
+        if math.isnan(s):
+            return ""
+    except TypeError:
+        pass
     
-    Args:
-        name1: First business name
-        name2: Second business name
-        
-    Returns:
-        Jaccard similarity score in [0, 1]
-    """
-    if not name1 or not name2:
-        return 0.0
-    set1 = set(name1.lower().split())
-    set2 = set(name2.lower().split())
+    val = str(s).strip()
+    if val.lower() in ("nan", "none", "<na>"):
+        return ""
+    return val
+
+def _jaccard(tokens1: list, tokens2: list) -> float:
+    """Token-level Jaccard similarity: |A ∩ B| / |A ∪ B|."""
+    set1, set2 = set(tokens1), set(tokens2)
+    if not set1 and not set2:
+        return 1.0
     if not set1 or not set2:
         return 0.0
-    intersection = set1 & set2
-    union = set1 | set2
-    return float(len(intersection) / len(union))
+    return len(set1 & set2) / len(set1 | set2)
 
-
-def levenshtein_distance(name1: str, name2: str) -> int:
+def generate_name_features(
+    s1_name: str,
+    candidate_name: str,
+    tfidf_vectorizer=None,
+    char_vectorizer=None
+) -> Dict[str, float]:
     """
-    Compute Levenshtein edit distance between two business names.
+    Compute pairwise similarity features for business names.
     
     Args:
-        name1: First business name
-        name2: Second business name
+        s1_name: Phase 2 normalized name for S1.
+        candidate_name: Phase 2 normalized name for candidate (S2/S3).
+        tfidf_vectorizer: Pre-fit sklearn TfidfVectorizer (word-level).
+        char_vectorizer: Pre-fit sklearn TfidfVectorizer (char-level).
         
     Returns:
-        Edit distance (number of character operations)
+        Dictionary of 11 required feature names to deterministic float values.
     """
-    if not name1 or not name2:
-        return max(len(name1 or ""), len(name2 or ""))
-    return int(distance.Levenshtein.distance(name1.lower(), name2.lower()))
-
-
-def token_sort_ratio(name1: str, name2: str) -> float:
-    """
-    Compute token sort ratio similarity between two business names.
+    n1 = _clean_str(s1_name)
+    n2 = _clean_str(candidate_name)
     
-    Tokenizes both strings, sorts the tokens, and computes similarity.
-    Handles word reordering issues. Returns scaled score in [0.0, 1.0].
+    features = {}
     
-    Args:
-        name1: First business name
-        name2: Second business name
+    # 1. name_levenshtein
+    features["name_levenshtein"] = float(distance.Levenshtein.distance(n1, n2))
+    
+    if not n1 and not n2:
+        features["name_fuzz_ratio"] = 100.0
+        features["name_ratio"] = 1.0
+        features["name_wratio"] = 100.0
+        features["name_token_sort_ratio"] = 100.0
+        features["name_token_set_ratio"] = 100.0
+        features["name_jaccard"] = 1.0
+        features["name_tfidf_cosine"] = 1.0
+        features["name_char_cosine"] = 1.0
+        features["name_length_diff"] = 0.0
+        features["name_length_ratio"] = 1.0
+        features["name_token_count_diff"] = 0.0
+        return features
         
-    Returns:
-        Similarity ratio in [0.0, 1.0]
-    """
-    if not name1 or not name2:
-        return 0.0
-    return float(fuzz.token_sort_ratio(name1, name2) / 100.0)
-
-
-def partial_ratio(name1: str, name2: str) -> float:
-    """
-    Compute partial ratio similarity between two business names.
-    
-    Finds the best matching substring and computes similarity.
-    Returns scaled score in [0.0, 1.0].
-    
-    Args:
-        name1: First business name
-        name2: Second business name
+    if not n1 or not n2:
+        features["name_fuzz_ratio"] = 0.0
+        features["name_ratio"] = 0.0
+        features["name_wratio"] = 0.0
+        features["name_token_sort_ratio"] = 0.0
+        features["name_token_set_ratio"] = 0.0
+        features["name_jaccard"] = 0.0
+        features["name_tfidf_cosine"] = 0.0
+        features["name_char_cosine"] = 0.0
+        features["name_length_diff"] = float(abs(len(n1) - len(n2)))
+        features["name_length_ratio"] = 0.0
         
-    Returns:
-        Similarity ratio in [0.0, 1.0]
-    """
-    if not name1 or not name2:
-        return 0.0
-    return float(fuzz.partial_ratio(name1, name2) / 100.0)
+        t1, t2 = n1.split(), n2.split()
+        features["name_token_count_diff"] = float(abs(len(t1) - len(t2)))
+        return features
+
+    # RapidFuzz returns [0, 100]
+    features["name_fuzz_ratio"] = fuzz.ratio(n1, n2)
+    features["name_ratio"] = features["name_fuzz_ratio"] / 100.0
+    features["name_wratio"] = fuzz.WRatio(n1, n2)
+    features["name_token_sort_ratio"] = fuzz.token_sort_ratio(n1, n2)
+    features["name_token_set_ratio"] = fuzz.token_set_ratio(n1, n2)
+    
+    # Jaccard
+    t1, t2 = n1.split(), n2.split()
+    features["name_jaccard"] = _jaccard(t1, t2)
+    
+    # Length features
+    len1, len2 = len(n1), len(n2)
+    features["name_length_diff"] = float(abs(len1 - len2))
+    features["name_length_ratio"] = float(min(len1, len2) / max(len1, len2))
+    features["name_token_count_diff"] = float(abs(len(t1) - len(t2)))
+    
+    # TF-IDF Cosine (Word)
+    features["name_tfidf_cosine"] = 0.0
+    if tfidf_vectorizer is not None:
+        try:
+            vecs = tfidf_vectorizer.transform([n1, n2])
+            # v1 * v2^T since vectors are L2 normalized by default
+            cos = (vecs[0] @ vecs[1].T).toarray()[0][0]
+            features["name_tfidf_cosine"] = float(cos)
+        except Exception:
+            features["name_tfidf_cosine"] = 0.0
+
+    # TF-IDF Cosine (Char)
+    features["name_char_cosine"] = 0.0
+    if char_vectorizer is not None:
+        try:
+            vecs = char_vectorizer.transform([n1, n2])
+            cos = (vecs[0] @ vecs[1].T).toarray()[0][0]
+            features["name_char_cosine"] = float(cos)
+        except Exception:
+            features["name_char_cosine"] = 0.0
+    return features
 
 
-def acronym_match(name1: str, name2: str) -> bool:
-    """
-    Check if either name is an acronym of the other or if acronyms match.
-    
-    Example: "ABC Corp" matches "ABC"
-    
-    Args:
-        name1: First business name
-        name2: Second business name
-        
-    Returns:
-        True if acronym match found
-    """
-    if not name1 or not name2:
-        return False
-    
-    t1 = [w for w in re.split(r'\s+', name1.strip()) if w]
-    t2 = [w for w in re.split(r'\s+', name2.strip()) if w]
-    
-    if not t1 or not t2:
-        return False
-
-    acronym1 = "".join(w[0] for w in t1).lower()
-    acronym2 = "".join(w[0] for w in t2).lower()
-    
-    s1_clean = "".join(t1).lower()
-    s2_clean = "".join(t2).lower()
-    
-    if len(s1_clean) >= 2 and s1_clean == acronym2:
-        return True
-    if len(s2_clean) >= 2 and s2_clean == acronym1:
-        return True
-    if len(acronym1) >= 2 and len(acronym2) >= 2 and acronym1 == acronym2:
-        return True
-        
-    return False
+def extract_name_features(name1: str, name2: str, suffix1: Optional[str] = None, suffix2: Optional[str] = None) -> Dict[str, float]:
+    """Backward-compatible functional entrypoint for name features."""
+    return generate_name_features(name1, name2)
 
 
 class NameFeatureExtractor:
-    """
-    Feature extractor for business name pairs.
-    
-    Computes a comprehensive set of similarity features between
-    business names for entity matching.
-    """
-    
+    """Class wrapper for name feature extraction."""
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize name feature extractor.
-        
-        Args:
-            config: Feature configuration parameters
-        """
         self.config = config or {}
-        self.features = self.config.get('name_features', [
-            'ratio',
-            'wratio',
-            'jaccard_similarity',
-            'levenshtein_distance',
-            'token_sort_ratio',
-            'token_set_ratio',
-            'partial_ratio',
-            'acronym_match'
-        ])
-        logger.info(f"Initializing NameFeatureExtractor with {len(self.features)} features")
-    
+
     def extract_features(self, name1: str, name2: str) -> Dict[str, float]:
-        """
-        Extract name similarity features for a name pair.
-        
-        Args:
-            name1: First business name
-            name2: Second business name
-            
-        Returns:
-            Dictionary of feature name -> feature value (all float values in 0..1 or exact metric)
-        """
-        n1 = str(name1 or "")
-        n2 = str(name2 or "")
+        return generate_name_features(name1, name2)
 
-        features: Dict[str, float] = {}
-        
-        if 'ratio' in self.features or 'name_ratio' in self.features:
-            features['name_ratio'] = float(fuzz.ratio(n1, n2) / 100.0) if n1 and n2 else 0.0
-            
-        if 'wratio' in self.features or 'name_wratio' in self.features:
-            features['name_wratio'] = float(fuzz.WRatio(n1, n2) / 100.0) if n1 and n2 else 0.0
-
-        if 'jaccard_similarity' in self.features or 'name_jaccard' in self.features:
-            features['name_jaccard'] = jaccard_similarity(n1, n2)
-        
-        if 'levenshtein_distance' in self.features or 'name_levenshtein' in self.features:
-            features['name_levenshtein'] = float(levenshtein_distance(n1, n2))
-        
-        if 'token_sort_ratio' in self.features or 'name_token_sort' in self.features:
-            features['name_token_sort'] = token_sort_ratio(n1, n2)
-            
-        if 'token_set_ratio' in self.features or 'name_token_set' in self.features:
-            features['name_token_set'] = float(fuzz.token_set_ratio(n1, n2) / 100.0) if n1 and n2 else 0.0
-        
-        if 'partial_ratio' in self.features or 'name_partial_ratio' in self.features:
-            features['name_partial_ratio'] = partial_ratio(n1, n2)
-        
-        if 'acronym_match' in self.features or 'name_acronym_match' in self.features:
-            features['name_acronym_match'] = float(acronym_match(n1, n2))
-        
-        # Primary summary similarity score for name
-        features['name_similarity'] = features.get('name_wratio', features.get('name_token_sort', 0.0))
-        
-        return features
-    
-    def extract_features_batch(self, name_pairs: list) -> list:
-        """
-        Extract features for multiple name pairs.
-        
-        Args:
-            name_pairs: List of (name1, name2) tuples
-            
-        Returns:
-            List of feature dictionaries
-        """
-        return [self.extract_features(n1, n2) for n1, n2 in name_pairs]

@@ -1,0 +1,31 @@
+# Amazon ML Challenge 2026 - Phase 6 Complete Integration Configuration
+# ====================================================================
+
+experiment_id: "EXP-001"
+random_seed: 42
+
+model:
+  model_path: "models/xgb_baseline.json"
+
+features:
+  val_features_path: "features/validation_features.parquet"
+  train_features_path: "features/train_features.parquet"
+
+phase5_reference:
+  predictions_path: "experiments/phase5/member3/working_validation_predictions.parquet"
+
+decision:
+  calibration_method: "raw"  # Raw model probabilities are used as calibrated probabilities
+  threshold: 0.94
+  margin: 0.00
+  single_match_only: false
+
+aws:
+  profile: "amazon-ml"
+  region: "ap-south-1"
+  s3_bucket: "s3://amazon-ml-challenge-2026-atharva"
+  s3_phase6_prefix: "phase6"
+  sagemaker_instance_type: "ml.m5.2xlarge"
+
+outputs:
+  local_dir: "experiments/phase6"

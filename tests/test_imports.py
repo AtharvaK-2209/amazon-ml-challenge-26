@@ -1,5 +1,5 @@
 """
-Test module imports for Phase 0 verification.
+Test module imports for verification.
 
 This test verifies that all modules can be imported successfully
 and that the project structure is correct.
@@ -15,9 +15,14 @@ class TestImports:
     def test_import_config(self):
         """Test config module imports."""
         from src.config import Config, load_config, get_config
+        import src.config as config
         assert Config is not None
         assert load_config is not None
         assert get_config is not None
+        assert hasattr(config, "MODEL")
+        assert hasattr(config, "BLOCKING")
+        assert hasattr(config, "NORM")
+        assert hasattr(config, "FEATURES")
     
     def test_import_preprocessing(self):
         """Test preprocessing modules import."""
@@ -39,11 +44,13 @@ class TestImports:
     
     def test_import_features(self):
         """Test feature modules import."""
-        from src.features.name_features import NameFeatureExtractor
-        from src.features.address_features import AddressFeatureExtractor
+        from src.features.name_features import NameFeatureExtractor, extract_name_features
+        from src.features.address_features import AddressFeatureExtractor, extract_address_features
         from src.features.pair_features import PairFeatureExtractor, build_feature_matrix
         assert NameFeatureExtractor is not None
+        assert extract_name_features is not None
         assert AddressFeatureExtractor is not None
+        assert extract_address_features is not None
         assert PairFeatureExtractor is not None
         assert build_feature_matrix is not None
     
@@ -129,7 +136,7 @@ class TestProjectStructure:
             assert path.is_file(), f"{file_path} is not a file"
     
     def test_placeholder_modules_exist(self):
-        """Test that all placeholder modules exist."""
+        """Test that all modules exist."""
         modules = [
             'src/preprocessing/normalize.py',
             'src/preprocessing/address_parser.py',

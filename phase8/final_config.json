@@ -1,0 +1,12 @@
+{
+    "model": "XGBoost",
+    "model_version": "xgb_baseline",
+    "feature_set": "Phase 6 baseline (47 pairwise features)",
+    "blocking": "Multi-attribute TF-IDF and candidate indexing",
+    "calibration": "raw",
+    "threshold": 0.94,
+    "margin": 0.0,
+    "singleton_rule": "assign_highest_above_threshold",
+    "candidate_count_rule": "process_all_candidates",
+    "s2_s3_rule": "prioritize_higher_probability_source"
+}
