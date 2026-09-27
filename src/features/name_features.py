@@ -60,6 +60,7 @@ def generate_name_features(
     
     if not n1 and not n2:
         features["name_fuzz_ratio"] = 100.0
+        features["name_ratio"] = 1.0
         features["name_wratio"] = 100.0
         features["name_token_sort_ratio"] = 100.0
         features["name_token_set_ratio"] = 100.0
@@ -73,6 +74,7 @@ def generate_name_features(
         
     if not n1 or not n2:
         features["name_fuzz_ratio"] = 0.0
+        features["name_ratio"] = 0.0
         features["name_wratio"] = 0.0
         features["name_token_sort_ratio"] = 0.0
         features["name_token_set_ratio"] = 0.0
@@ -88,6 +90,7 @@ def generate_name_features(
 
     # RapidFuzz returns [0, 100]
     features["name_fuzz_ratio"] = fuzz.ratio(n1, n2)
+    features["name_ratio"] = features["name_fuzz_ratio"] / 100.0
     features["name_wratio"] = fuzz.WRatio(n1, n2)
     features["name_token_sort_ratio"] = fuzz.token_sort_ratio(n1, n2)
     features["name_token_set_ratio"] = fuzz.token_set_ratio(n1, n2)
@@ -122,5 +125,19 @@ def generate_name_features(
             features["name_char_cosine"] = float(cos)
         except Exception:
             features["name_char_cosine"] = 0.0
-            
     return features
+
+
+def extract_name_features(name1: str, name2: str, suffix1: Optional[str] = None, suffix2: Optional[str] = None) -> Dict[str, float]:
+    """Backward-compatible functional entrypoint for name features."""
+    return generate_name_features(name1, name2)
+
+
+class NameFeatureExtractor:
+    """Class wrapper for name feature extraction."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
+
+    def extract_features(self, name1: str, name2: str) -> Dict[str, float]:
+        return generate_name_features(name1, name2)
+
